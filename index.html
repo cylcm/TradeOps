@@ -1,0 +1,2481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0c0f14">
+<meta name="apple-mobile-web-app-title" content="Trading Ops">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="config/icon-180.png">
+<link rel="icon" type="image/png" href="config/icon-192.png">
+<title>Trading Operations Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --ink:#0c0f14;
+  --panel:#141922;
+  --panel-2:#1b212d;
+  --line:#252d3a;
+  --line-soft:#1f2630;
+  --txt:#e6ebf2;
+  --txt-dim:#8a94a6;
+  --txt-faint:#5b6577;
+  --accent:#4ade80;
+  --accent-dim:#22c55e;
+  --loss:#f87171;
+  --warn:#fbbf24;
+  --info:#60a5fa;
+  --radius:10px;
+  --mono:'SF Mono',ui-monospace,'Cascadia Code','Roboto Mono',Menlo,Consolas,monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{
+  background:var(--ink);
+  color:var(--txt);
+  font-family:var(--sans);
+  font-size:14px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+  overscroll-behavior:none;
+}
+button{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px}
+::-webkit-scrollbar-thumb:hover{background:#33405266}
+
+/* ---------- Layout shell ---------- */
+.app{display:flex;height:100vh;height:100dvh;width:100vw}
+.sidebar{
+  width:236px;flex-shrink:0;background:var(--panel);
+  border-right:1px solid var(--line);display:flex;flex-direction:column;
+  transition:transform .22s ease;
+  padding-top:env(safe-area-inset-top);
+  padding-left:env(safe-area-inset-left);
+}
+.brand{
+  padding:20px 20px 16px;border-bottom:1px solid var(--line-soft);
+  display:flex;align-items:center;gap:11px;
+}
+.brand-mark{
+  width:30px;height:30px;border-radius:7px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--accent),var(--accent-dim));
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;color:var(--ink);font-size:15px;font-family:var(--mono);
+}
+.brand-text h1{font-size:13px;font-weight:600;letter-spacing:.02em;line-height:1.2}
+.brand-text span{font-size:10.5px;color:var(--txt-faint);font-family:var(--mono);letter-spacing:.04em;text-transform:uppercase}
+.nav{flex:1;overflow-y:auto;padding:12px 10px}
+.nav-group{margin-bottom:6px}
+.nav-label{
+  font-size:10px;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--txt-faint);padding:12px 12px 6px;font-weight:600;
+}
+.nav-item{
+  display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:7px;
+  cursor:pointer;color:var(--txt-dim);font-size:13px;font-weight:500;
+  transition:background .12s,color .12s;user-select:none;
+}
+.nav-item:hover{background:var(--panel-2);color:var(--txt)}
+.nav-item.active{background:var(--panel-2);color:var(--txt)}
+.nav-item.active .nav-ico{color:var(--accent)}
+.nav-ico{width:17px;height:17px;flex-shrink:0;color:var(--txt-faint);transition:color .12s}
+.nav-item .badge{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--txt-faint);background:var(--ink);padding:1px 6px;border-radius:10px}
+
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.topbar{
+  height:56px;flex-shrink:0;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;padding:0 24px;gap:16px;background:var(--panel);
+  padding-top:env(safe-area-inset-top);
+  padding-right:max(24px,env(safe-area-inset-right));
+  box-sizing:content-box;
+}
+.topbar h2{font-size:16px;font-weight:600;letter-spacing:.01em}
+.topbar .sub{color:var(--txt-faint);font-size:12px;font-family:var(--mono)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.hamburger{display:none;background:none;border:none;color:var(--txt);cursor:pointer;padding:8px;margin-left:-8px;border-radius:7px}
+.hamburger:active{background:var(--panel-2)}
+
+.content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:24px;padding-bottom:max(24px,env(safe-area-inset-bottom));padding-right:max(24px,env(safe-area-inset-right))}
+.view{display:none;animation:fade .25s ease}
+.view.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ---------- Buttons & inputs ---------- */
+.btn{
+  font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;
+  border:1px solid var(--line);background:var(--panel-2);color:var(--txt);
+  padding:8px 14px;border-radius:7px;display:inline-flex;align-items:center;gap:7px;
+  transition:all .12s;white-space:nowrap;
+}
+.btn:hover{border-color:#33405a;background:#222a38}
+.btn-primary{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+.btn-primary:hover{background:var(--accent-dim);border-color:var(--accent-dim)}
+.btn-danger{color:var(--loss);border-color:#3a2630}
+.btn-danger:hover{background:#2a1a1f;border-color:#5a3640}
+.btn-ghost{background:transparent;border-color:transparent;color:var(--txt-dim)}
+.btn-ghost:hover{background:var(--panel-2);color:var(--txt)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn svg{width:15px;height:15px}
+
+label{display:block;font-size:12px;color:var(--txt-dim);margin-bottom:5px;font-weight:500}
+input,select,textarea{
+  width:100%;font-family:var(--sans);font-size:16px;color:var(--txt);
+  background:var(--ink);border:1px solid var(--line);border-radius:7px;
+  padding:9px 11px;transition:border-color .12s;
+}
+@media(min-width:761px){
+  input,select,textarea{font-size:13px}
+  input[type=number]{font-size:13px}
+}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent-dim)}
+input[type=number]{font-family:var(--mono)}
+textarea{resize:vertical;min-height:70px;line-height:1.5}
+.field{margin-bottom:14px}
+.field-row{display:grid;gap:14px}
+.grid-2{grid-template-columns:1fr 1fr}
+.grid-3{grid-template-columns:1fr 1fr 1fr}
+.grid-4{grid-template-columns:repeat(4,1fr)}
+
+/* ---------- Cards ---------- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+.card-head{display:flex;align-items:center;margin-bottom:16px;gap:10px}
+.card-head h3{font-size:14px;font-weight:600}
+.card-head .actions{margin-left:auto;display:flex;gap:8px}
+.card-sub{font-size:11.5px;color:var(--txt-faint);font-family:var(--mono)}
+
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:18px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;position:relative;overflow:hidden}
+.stat .k{font-size:11px;color:var(--txt-dim);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:7px}
+.stat .v{font-size:23px;font-weight:600;font-family:var(--mono);letter-spacing:-.01em}
+.stat .meta{font-size:11px;color:var(--txt-faint);font-family:var(--mono);margin-top:3px}
+.stat .spark{position:absolute;right:0;bottom:0;width:60px;height:32px;opacity:.5}
+.pos{color:var(--accent)}
+.neg{color:var(--loss)}
+.dim{color:var(--txt-dim)}
+
+.dash-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px}
+.chart-wrap{position:relative;height:300px}
+.chart-wrap.sm{height:220px}
+
+/* ---------- Table ---------- */
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{
+  text-align:left;padding:11px 13px;background:var(--panel-2);
+  font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--txt-dim);font-weight:600;border-bottom:1px solid var(--line);
+  white-space:nowrap;position:sticky;top:0;
+}
+td{padding:10px 13px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tbody tr{transition:background .1s}
+tbody tr:hover{background:var(--panel-2)}
+.num{font-family:var(--mono);text-align:right}
+.tag{
+  display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600;
+  font-family:var(--mono);
+}
+.tag-long{background:#10241a;color:var(--accent)}
+.tag-short{background:#2a161b;color:var(--loss)}
+.tag-grade{background:var(--panel-2);border:1px solid var(--line)}
+.grade-A{color:var(--accent)}.grade-B{color:var(--info)}.grade-C{color:var(--warn)}.grade-D{color:var(--loss)}
+.empty{text-align:center;padding:48px 20px;color:var(--txt-faint)}
+.empty svg{width:38px;height:38px;margin-bottom:12px;opacity:.4}
+.empty p{font-size:13px;margin-bottom:4px;color:var(--txt-dim)}
+.empty span{font-size:12px}
+
+/* ---------- Modal ---------- */
+.modal-bg{
+  position:fixed;inset:0;background:#05070be0;display:none;z-index:100;
+  align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;
+  backdrop-filter:blur(2px);
+}
+.modal-bg.open{display:flex}
+.modal{
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  width:100%;max-width:640px;animation:pop .2s ease;margin:auto;
+}
+.modal.wide{max-width:860px}
+@keyframes pop{from{opacity:0;transform:scale(.97) translateY(8px)}to{opacity:1;transform:none}}
+.modal-head{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center}
+.modal-head h3{font-size:15px;font-weight:600}
+.modal-head .close{margin-left:auto;background:none;border:none;color:var(--txt-dim);cursor:pointer;padding:4px;border-radius:5px}
+.modal-head .close:hover{background:var(--panel-2);color:var(--txt)}
+.modal-body{padding:22px;max-height:calc(100vh - 220px);overflow-y:auto}
+.modal-foot{padding:16px 22px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end}
+
+/* ---------- Misc ---------- */
+.row{display:flex;align-items:center;gap:10px}
+.spread{justify-content:space-between}
+.wrap{flex-wrap:wrap}
+.mb{margin-bottom:16px}
+.section-title{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--txt-dim);font-weight:600;margin:22px 0 12px}
+.divider{height:1px;background:var(--line-soft);margin:18px 0}
+.pill{font-size:11px;font-family:var(--mono);padding:3px 9px;border-radius:20px;background:var(--panel-2);border:1px solid var(--line);color:var(--txt-dim)}
+.checklist-item{display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;cursor:pointer;transition:all .12s}
+.checklist-item:hover{border-color:#33405a;background:var(--panel-2)}
+.checklist-item.checked{border-color:var(--accent-dim);background:#0f1d16}
+.checkbox{width:19px;height:19px;border:2px solid var(--line);border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .12s}
+.checklist-item.checked .checkbox{background:var(--accent);border-color:var(--accent)}
+.checklist-item.checked .checkbox svg{display:block}
+.checkbox svg{display:none;width:13px;height:13px;color:var(--ink)}
+.toast{
+  position:fixed;bottom:22px;right:22px;background:var(--panel-2);border:1px solid var(--line);
+  padding:12px 18px;border-radius:9px;font-size:13px;z-index:200;display:flex;align-items:center;gap:10px;
+  box-shadow:0 12px 40px #0008;animation:slideup .25s ease;max-width:340px;
+}
+@keyframes slideup{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.toast.ok{border-left:3px solid var(--accent)}
+.toast.err{border-left:3px solid var(--loss)}
+.toast.warn{border-left:3px solid var(--warn)}
+.score-bar{height:6px;background:var(--ink);border-radius:4px;overflow:hidden;margin-top:8px}
+.score-fill{height:100%;border-radius:4px;transition:width .4s ease}
+.range-wrap{display:flex;align-items:center;gap:12px}
+.range-wrap input[type=range]{flex:1;padding:0}
+.range-val{font-family:var(--mono);font-size:14px;font-weight:600;min-width:28px;text-align:right}
+.ai-out{background:var(--ink);border:1px solid var(--line);border-radius:9px;padding:18px;font-size:13px;line-height:1.7;white-space:pre-wrap}
+.ai-out h4{color:var(--accent);font-size:13px;margin:14px 0 6px;font-weight:600}
+.ai-out h4:first-child{margin-top:0}
+.spinner{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.kvs{display:grid;grid-template-columns:auto 1fr;gap:8px 18px;font-size:12.5px}
+.kvs .k{color:var(--txt-dim)}
+.kvs .v{font-family:var(--mono);text-align:right}
+.lib-card,.lesson-card{border:1px solid var(--line);border-radius:9px;padding:14px;margin-bottom:10px;transition:border-color .12s}
+.lib-card:hover,.lesson-card:hover{border-color:#33405a}
+.lib-card .row,.lesson-card .row{margin-bottom:6px}
+.note-meta{font-size:11px;color:var(--txt-faint);font-family:var(--mono)}
+.bookprog{display:flex;gap:5px;margin-top:8px}
+.bookprog .seg{flex:1;height:4px;border-radius:2px;background:var(--line)}
+.bookprog .seg.on{background:var(--accent)}
+
+/* ---------- Backup reminder banner ---------- */
+.backup-banner{
+  display:none;align-items:center;gap:12px;margin:0 0 16px;padding:12px 16px;
+  background:linear-gradient(90deg,#2a210f,#1f1a0d);border:1px solid #4a3a16;
+  border-radius:var(--radius);font-size:13px;
+}
+.backup-banner.show{display:flex}
+.backup-banner .bb-ico{color:var(--warn);flex-shrink:0;display:flex}
+.backup-banner .bb-text{flex:1;min-width:0}
+.backup-banner .bb-text b{color:var(--warn)}
+.backup-banner .bb-actions{display:flex;gap:8px;flex-shrink:0}
+@media(max-width:760px){
+  .backup-banner{flex-wrap:wrap}
+  .backup-banner .bb-actions{width:100%}
+  .backup-banner .bb-actions .btn{flex:1;justify-content:center}
+}
+
+/* ---------- Sidebar backdrop (mobile) ---------- */
+.backdrop{display:none;position:fixed;inset:0;background:#05070bb0;z-index:80;backdrop-filter:blur(1px)}
+.backdrop.open{display:block}
+
+/* Tablet (iPad portrait, mid Android tablets) */
+@media(max-width:1024px){
+  .dash-grid{grid-template-columns:1fr}
+}
+@media(max-width:920px){
+  .field-row.grid-3,.field-row.grid-4{grid-template-columns:1fr 1fr}
+}
+/* Phones & narrow tablets: collapse sidebar to drawer */
+@media(max-width:760px){
+  .sidebar{
+    position:fixed;z-index:90;top:0;bottom:0;height:100%;width:min(82vw,300px);
+    transform:translateX(-105%);box-shadow:0 0 60px #000a;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .sidebar.open{transform:none}
+  .hamburger{display:block}
+  .nav-item{padding:12px 14px;font-size:14px}
+  .nav-ico{width:19px;height:19px}
+  .field-row.grid-2,.field-row.grid-3,.field-row.grid-4{grid-template-columns:1fr}
+  .content{padding:16px}
+  .stat-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .stat{padding:13px 14px}
+  .stat .v{font-size:20px}
+  .card{padding:15px}
+  .btn{padding:10px 14px}
+  .btn-sm{padding:8px 12px}
+  /* modal becomes a bottom sheet that fills the screen */
+  .modal-bg{padding:0;align-items:flex-end}
+  .modal,.modal.wide{max-width:100%;border-radius:16px 16px 0 0;max-height:94vh;max-height:94dvh;display:flex;flex-direction:column;margin:0}
+  .modal-body{max-height:none;flex:1;padding:18px;padding-bottom:max(18px,env(safe-area-inset-bottom))}
+  .modal-foot{flex-wrap:wrap;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+  .modal-foot .btn{flex:1;justify-content:center;min-width:120px}
+  .topbar h2{font-size:15px}
+  .chart-wrap{height:240px}
+  .chart-wrap.sm{height:200px}
+  .toast{left:16px;right:16px;bottom:max(16px,env(safe-area-inset-bottom));max-width:none}
+  th,td{padding:9px 10px}
+  .cf-cols{grid-template-columns:1fr!important}
+}
+@media(max-width:380px){
+  .stat-grid{grid-template-columns:1fr}
+}
+/* coarse pointer = touch: kill hover states that "stick" on tap */
+@media(hover:none){
+  .nav-item:hover{background:transparent;color:var(--txt-dim)}
+  .nav-item.active:hover{background:var(--panel-2);color:var(--txt)}
+  tbody tr:hover{background:transparent}
+  .btn:hover{border-color:var(--line);background:var(--panel-2)}
+  .btn-primary:hover{background:var(--accent);border-color:var(--accent)}
+  .lib-card:hover,.lesson-card:hover{border-color:var(--line)}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">TO</div>
+      <div class="brand-text">
+        <h1>Trading Ops</h1>
+        <span>Production Desk</span>
+      </div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+  </aside>
+  <div class="backdrop" id="backdrop" onclick="toggleSidebar()"></div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <button class="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div>
+        <h2 id="viewTitle">Dashboard</h2>
+      </div>
+      <div class="topbar-right" id="topbarRight"></div>
+    </div>
+    <div class="content" id="content">
+      <div class="backup-banner" id="backupBanner">
+        <span class="bb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></span>
+        <span class="bb-text" id="backupBannerText"></span>
+        <span class="bb-actions">
+          <button class="btn btn-sm" onclick="dismissBackupBanner()">Later</button>
+          <button class="btn btn-primary btn-sm" onclick="exportData()">Export now</button>
+        </span>
+      </div>
+      <div id="viewRoot"></div>
+    </div>
+  </div>
+</div>
+<div class="modal-bg" id="modalBg"><div class="modal" id="modalEl"></div></div>
+<script>
+/* ============================================================
+   TRADING OPERATIONS PLATFORM  — single-file browser app
+   Data persists in localStorage. Export/Import JSON for backup.
+   ============================================================ */
+
+const STORE_KEY = 'tradeops_v1';
+const SCHEMA_VERSION = 1;
+
+/* ---------- Default operational checklists (seed; editable thereafter) ---------- */
+function defaultOpsChecklists(){
+  return [
+    {id:'daily', title:'Daily Operational Checklist', sub:'30–60 min/day', groups:[
+      {id:'g_pre', name:'1. Pre-Market Sign-Off (10 min)', items:[
+        {id:'d_env', t:'Environment check: open chart platform, load SPY & QQQ'},
+        {id:'d_macro', t:'Identify macro trend: HH/HL (up), LH/LL (down), or sideways (range)'},
+        {id:'d_infra', t:'Identify key infrastructure: draw nearest major support & resistance'},
+        {id:'d_ready', t:'Readiness confirmation: today is data collection, not prediction'}
+      ]},
+      {id:'g_live', name:'2. Live Session Observation (10 min)', items:[
+        {id:'d_candle', t:'Candlestick validation: watch body vs wick at S/R zones'},
+        {id:'d_emo', t:'Emotional control: label any buy/sell impulse, step away, record it'},
+        {id:'d_iso', t:'Strategy isolation: hunt only one selected setup (Phase 3)'}
+      ]},
+      {id:'g_pir', name:'3. Post-Incident Review / PIR (10 min)', items:[
+        {id:'d_doc', t:'Document the day: final screenshot — did S/R levels hold?'},
+        {id:'d_ledger', t:'Update the ledger: log all 7 fields for any paper trade'},
+        {id:'d_read', t:'Curriculum progress: 15–30 min reading / Trading in the Zone'}
+      ]}
+    ]},
+    {id:'weekly', title:'Weekly Quality Assurance (QA) Checklist', sub:'every weekend', groups:[
+      {id:'g_p1', name:'Phase 1 (Wk 1–4): Market Foundations', items:[
+        {id:'w1', t:'Wk1: Can I articulate ETF (e.g. VOO) vs index differences?'},
+        {id:'w2', t:'Wk2: 5 screenshots of candlestick structures (Doji, Hammer, Engulfing)?'},
+        {id:'w3', t:'Wk3: Audited 10 charts and categorized macro trend correctly?'},
+        {id:'w4', t:'Wk4: S/R lines map accurately to historic turning points on SPY/QQQ?'}
+      ]},
+      {id:'g_p2', name:'Phase 2 (Wk 5–6): Risk Management', items:[
+        {id:'w5', t:'Wk5: Risk Excel built — can size shares to risk exactly 1% with a given stop?'},
+        {id:'w6', t:'Wk6: Trading journal clean, fully formatted, no missing fields?'}
+      ]},
+      {id:'g_p3', name:'Phase 3 (Wk 7–8): Paper Trading', items:[
+        {id:'w7', t:'Wk7: Written single-page "Runbook" with exact rules of chosen strategy?'},
+        {id:'w8', t:'Wk8: Logged 10–20 paper trades — pass only if rules followed perfectly'}
+      ]},
+      {id:'g_p45', name:'Phase 4 & 5 (Wk 9–12): Options & Futures Staging', items:[
+        {id:'w910', t:'Wk9–10: Can I explain Theta / time decay as a silent drain over a weekend?'},
+        {id:'w1112', t:'Wk11–12: Do I know the dollar value of 1 tick on Micro E-mini S&P futures?'}
+      ]},
+      {id:'g_health', name:'Weekly System Health Metrics', items:[
+        {id:'w_time', t:'Time tracking: hit 30–60 min focused effort daily? (missed = downtime)'},
+        {id:'w_reading', t:'Reading progress: completed assigned chapters for the month?'},
+        {id:'w_disc', t:'Discipline audit: any unauthorized live trades? (if yes, halt & reset to Phase 1)'}
+      ]}
+    ]}
+  ];
+}
+
+/* ---------- Default state ---------- */
+function blankState(){
+  return {
+    schema: SCHEMA_VERSION,
+    settings:{ account:'Trader', startingCapital:10000, currency:'SGD', riskPerTradePct:1 },
+    capital:[],            // capital transactions: {id, datetime, type:'deposit'|'withdrawal', amount, note}
+    trades:[],
+    strategies:[],
+    psych:[],            // psychology journal entries
+    lessons:[],          // RCA lessons-learned
+    library:[],          // study library
+    opsChecklist:{},     // tick-state for the operational/QA checklists, keyed by item id
+    opsChecklists:null,  // the editable checklist structure (seeded from default on first load)
+    quarterly:[],        // quarterly reviews
+    checklistTemplate:[
+      'Market trend identified',
+      'Risk calculated & within limit',
+      'Stop loss set',
+      'News / catalysts checked',
+      'Setup matches a playbook strategy'
+    ],
+    created: Date.now()
+  };
+}
+
+let state = loadState();
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return seedExample(blankState());
+    const parsed = JSON.parse(raw);
+    return migrate(parsed);
+  }catch(e){
+    console.error('Load failed, starting fresh', e);
+    return blankState();
+  }
+}
+function migrate(s){
+  if(!s.schema) s.schema = 1;
+  const base = blankState();
+  // ensure all keys exist
+  for(const k in base){ if(!(k in s)) s[k]=base[k]; }
+  // Backfill capital ledger: if empty but a startingCapital exists, seed it as the first deposit
+  if((!s.capital || !s.capital.length) && s.settings && Number(s.settings.startingCapital)>0){
+    s.capital=[{id:uid(),datetime:s.created||Date.now(),type:'deposit',amount:Number(s.settings.startingCapital),note:'Initial capital'}];
+  }
+  if(!Array.isArray(s.capital)) s.capital=[];
+  // Seed editable operational checklists from the default if not present
+  if(!s.opsChecklists || !Array.isArray(s.opsChecklists) || !s.opsChecklists.length){
+    s.opsChecklists = defaultOpsChecklists();
+  }
+  return s;
+}
+/* ---------- Capital helpers ---------- */
+function totalDeposits(){ return (state.capital||[]).filter(c=>c.type==='deposit').reduce((a,c)=>a+(Number(c.amount)||0),0); }
+function totalWithdrawals(){ return (state.capital||[]).filter(c=>c.type==='withdrawal').reduce((a,c)=>a+(Number(c.amount)||0),0); }
+function netCapital(){ return totalDeposits()-totalWithdrawals(); }
+function save(){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  }catch(e){
+    toast('Storage failed — export a backup now.', 'err');
+  }
+}
+
+/* ---------- Seed one example strategy so playbook isn't empty ---------- */
+function seedExample(s){
+  s.strategies.push({
+    id: uid(), name:'Trend Pullback', grade:'B', market:'Trending, above 20EMA',
+    entry:['Price above rising 20EMA','Pullback to support holds','Bullish reversal candle'],
+    exit:['Target = 2R','Stop below pullback low','Trail after 1.5R'],
+    risk:['Max 1% per trade','No trade in chop','One position at a time'],
+    created: Date.now()
+  });
+  s.capital.push({id:uid(),datetime:Date.now(),type:'deposit',amount:Number(s.settings.startingCapital)||10000,note:'Initial capital'});
+  s.opsChecklists = defaultOpsChecklists();
+  return s;
+}
+
+/* ---------- Helpers ---------- */
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+const $ = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+function cur(){ return state.settings.currency || 'SGD'; }
+function money(n){
+  if(n==null||isNaN(n)) return '—';
+  const sign = n<0?'-':'';
+  return sign + cur() + ' ' + Math.abs(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function moneyShort(n){
+  if(n==null||isNaN(n)) return '—';
+  const sign=n<0?'-':'';
+  const a=Math.abs(n);
+  if(a>=1000) return sign+cur()+' '+(a/1000).toFixed(1)+'k';
+  return sign+cur()+' '+a.toFixed(0);
+}
+function pct(n,d=1){ if(n==null||isNaN(n))return '—'; return n.toFixed(d)+'%'; }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDate(ts){ if(!ts)return '—'; const d=new Date(ts); return d.toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'}); }
+function fmtDateTime(ts){ if(!ts)return '—'; const d=new Date(ts); return d.toLocaleString(undefined,{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }
+function todayISO(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); }
+
+/* ---------- Toast ---------- */
+let toastTimer;
+function toast(msg,type='ok'){
+  const old=$('.toast'); if(old)old.remove();
+  const t=document.createElement('div');
+  t.className='toast '+type;
+  const ico = type==='err'?'⚠':type==='warn'?'!':'✓';
+  t.innerHTML=`<span>${ico}</span><span>${esc(msg)}</span>`;
+  document.body.appendChild(t);
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.remove(),3200);
+}
+
+/* ============================================================
+   METRICS ENGINE
+   ============================================================ */
+function netPL(t){
+  // prefer explicit net, else gross - commission
+  if(t.netPL!=null && t.netPL!=='') return Number(t.netPL);
+  const g = Number(t.grossPL)||0;
+  const c = Number(t.commission)||0;
+  return g - c;
+}
+function rMultiple(t){
+  const risk = Number(t.riskAmount);
+  if(!risk || risk<=0) return null;
+  return netPL(t)/risk;
+}
+function closedTrades(){ return state.trades.filter(t=>t.netPL!=null && t.netPL!=='' || (t.grossPL!=null&&t.grossPL!=='')); }
+
+function computeMetrics(){
+  const ts = state.trades.slice().sort((a,b)=>(a.datetime||0)-(b.datetime||0));
+  const closed = ts.filter(t=>(t.netPL!=null&&t.netPL!=='')||(t.grossPL!=null&&t.grossPL!==''));
+  const n = closed.length;
+  let wins=0,losses=0,grossWin=0,grossLoss=0,sum=0;
+  const rs=[];
+  closed.forEach(t=>{
+    const p=netPL(t); sum+=p;
+    if(p>0){wins++;grossWin+=p;} else if(p<0){losses++;grossLoss+=Math.abs(p);}
+    const r=rMultiple(t); if(r!=null) rs.push(r);
+  });
+  const winRate = n? (wins/n*100):0;
+  const profitFactor = grossLoss>0? grossWin/grossLoss : (grossWin>0?Infinity:0);
+  const avgWin = wins? grossWin/wins : 0;
+  const avgLoss = losses? grossLoss/losses : 0;
+  // expectancy in $ per trade
+  const expectancy = n? sum/n : 0;
+  // expectancy in R
+  const expectancyR = rs.length? rs.reduce((a,b)=>a+b,0)/rs.length : null;
+
+  // ----- Capital ledger -----
+  const deposits=totalDeposits();
+  const withdrawals=totalWithdrawals();
+  const capitalBase=deposits-withdrawals; // net invested capital
+
+  // equity curve: combine capital transactions + closed trades on one timeline
+  const events=[];
+  (state.capital||[]).forEach(c=>events.push({ts:c.datetime||0, kind:'cap', delta:(c.type==='withdrawal'?-1:1)*(Number(c.amount)||0)}));
+  closed.forEach(t=>events.push({ts:t.datetime||0, kind:'trade', delta:netPL(t), sym:t.symbol}));
+  events.sort((a,b)=>a.ts-b.ts);
+  let eq=0;
+  const curve=[{x:'Start',y:0,ts:state.created}];
+  events.forEach(e=>{ eq+=e.delta; curve.push({x:e.kind==='trade'?(e.sym||''):'＄',y:eq,ts:e.ts}); });
+  const finalEquity=eq; // = capitalBase + trading P/L
+
+  // max drawdown (only meaningful over the equity path)
+  let peak=-Infinity,maxDD=0,maxDDpct=0;
+  curve.forEach(p=>{
+    if(p.y>peak)peak=p.y;
+    const dd=peak-p.y;
+    if(dd>maxDD){maxDD=dd; maxDDpct=peak>0?dd/peak*100:0;}
+  });
+
+  // streaks
+  let curStreak=0,curType=null,maxWinStreak=0,maxLossStreak=0;
+  closed.forEach(t=>{
+    const p=netPL(t);
+    const type=p>0?'w':p<0?'l':'n';
+    if(type==='n')return;
+    if(type===curType){curStreak++;}else{curType=type;curStreak=1;}
+    if(type==='w')maxWinStreak=Math.max(maxWinStreak,curStreak);
+    else maxLossStreak=Math.max(maxLossStreak,curStreak);
+  });
+
+  // total return = trading P/L as % of net capital invested
+  const totalReturnPct = capitalBase>0? (sum/capitalBase*100) : 0;
+
+  // discipline score: avg rule compliance from psych + checklist completeness on trades
+  let disc = computeDisciplineScore(closed);
+  // risk score: how well risk is controlled (0-100)
+  let riskScore = computeRiskScore(closed,rs);
+
+  return {n,wins,losses,winRate,profitFactor,avgWin,avgLoss,expectancy,expectancyR,
+    netTotal:sum,curve,finalEquity,maxDD,maxDDpct,maxWinStreak,maxLossStreak,
+    totalReturnPct,disc,riskScore,rs,
+    deposits,withdrawals,capitalBase};
+}
+
+function computeDisciplineScore(closed){
+  // blend: trade checklist completion + psych rule-compliance answers
+  let pts=0,tot=0;
+  state.trades.forEach(t=>{
+    if(t.checklist && t.checklist.length){
+      pts += t.checklist.filter(Boolean).length;
+      tot += t.checklist.length;
+    }
+  });
+  let psychComp=null;
+  if(state.psych.length){
+    const c = state.psych.filter(p=>p.compliance==='yes').length;
+    psychComp = c/state.psych.length*100;
+  }
+  let checklistScore = tot? pts/tot*100 : null;
+  if(checklistScore==null && psychComp==null) return null;
+  if(checklistScore==null) return Math.round(psychComp);
+  if(psychComp==null) return Math.round(checklistScore);
+  return Math.round(checklistScore*0.6 + psychComp*0.4);
+}
+
+function computeRiskScore(closed,rs){
+  if(!closed.length) return null;
+  let score=100;
+  // penalty if any trade lost more than 1.5x its planned risk (stop discipline)
+  let blown=0;
+  closed.forEach(t=>{
+    const r=rMultiple(t);
+    if(r!=null && r<-1.5) blown++;
+  });
+  if(closed.length) score -= (blown/closed.length)*60;
+  // penalty for missing risk amounts (can't measure = risk unknown)
+  const missing = closed.filter(t=>!t.riskAmount||Number(t.riskAmount)<=0).length;
+  score -= (missing/closed.length)*25;
+  // penalty for large loss streak
+  return Math.max(0,Math.round(score));
+}
+/* ============================================================
+   NAVIGATION & ROUTING
+   ============================================================ */
+const ICONS = {
+  dashboard:'<path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>',
+  capital:'<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  playbook:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+  journal:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>',
+  psych:'<path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2z"/>',
+  analytics:'<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+  ai:'<path d="M12 2a5 5 0 0 0-5 5v1a5 5 0 0 0-2 4 5 5 0 0 0 2 4v1a5 5 0 0 0 10 0v-1a5 5 0 0 0 2-4 5 5 0 0 0-2-4V7a5 5 0 0 0-5-5z"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>',
+  readiness:'<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+  lessons:'<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
+  library:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+  quarterly:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  casefile:'<path d="M4 4h6l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>',
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'
+};
+const NAV = [
+  {group:'Operate', items:[
+    {id:'dashboard', label:'Dashboard'},
+    {id:'capital', label:'Capital'},
+    {id:'readiness', label:'Pre-Trade Readiness'},
+    {id:'journal', label:'Trade Journal'},
+    {id:'psych', label:'Psychology Log'},
+  ]},
+  {group:'Build', items:[
+    {id:'playbook', label:'Playbook'},
+    {id:'lessons', label:'Lessons (RCA)'},
+    {id:'library', label:'Study Library'},
+  ]},
+  {group:'Review', items:[
+    {id:'casefile', label:'Case Files'},
+    {id:'analytics', label:'Analytics'},
+    {id:'ai', label:'AI Insights'},
+    {id:'quarterly', label:'Quarterly Review'},
+  ]},
+  {group:'System', items:[
+    {id:'settings', label:'Settings & Backup'},
+  ]}
+];
+const TITLES = {dashboard:'Dashboard',capital:'Capital',readiness:'Pre-Trade Readiness',journal:'Trade Journal',psych:'Psychology Log',playbook:'Trading Playbook',lessons:'Lessons Learned (RCA)',library:'Study Library',casefile:'Case Files',analytics:'Analytics',ai:'AI Insights',quarterly:'Quarterly Review',settings:'Settings & Backup'};
+
+let currentView='dashboard';
+let charts={};
+
+function buildNav(){
+  const nav=$('#nav');
+  nav.innerHTML = NAV.map(g=>`
+    <div class="nav-group">
+      <div class="nav-label">${g.group}</div>
+      ${g.items.map(it=>{
+        const badge = navBadge(it.id);
+        return `<div class="nav-item" data-view="${it.id}" onclick="go('${it.id}')">
+          <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[it.id]}</svg>
+          <span>${it.label}</span>${badge}
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+  highlightNav();
+}
+function navBadge(id){
+  let n=0;
+  if(id==='journal')n=state.trades.length;
+  else if(id==='capital')n=(state.capital||[]).length;
+  else if(id==='playbook')n=state.strategies.length;
+  else if(id==='psych')n=state.psych.length;
+  else if(id==='lessons')n=state.lessons.length;
+  else if(id==='library')n=state.library.length;
+  else if(id==='quarterly')n=state.quarterly.length;
+  return n? `<span class="badge">${n}</span>`:'';
+}
+function highlightNav(){
+  $$('.nav-item').forEach(el=>el.classList.toggle('active', el.dataset.view===currentView));
+}
+function go(view){
+  currentView=view;
+  $('#viewTitle').textContent=TITLES[view]||view;
+  highlightNav();
+  if(window.innerWidth<=760) closeSidebar();
+  // destroy charts before re-render
+  Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});
+  charts={};
+  renderView(view);
+  if(typeof updateBackupBanner==='function') updateBackupBanner();
+}
+function toggleSidebar(){
+  const sb=$('#sidebar'), bd=$('#backdrop');
+  const open=sb.classList.toggle('open');
+  bd.classList.toggle('open',open);
+}
+function closeSidebar(){
+  $('#sidebar').classList.remove('open');
+  $('#backdrop').classList.remove('open');
+}
+
+function renderView(view){
+  const c=$('#viewRoot');
+  const tb=$('#topbarRight');
+  tb.innerHTML='';
+  switch(view){
+    case 'dashboard': renderDashboard(c,tb); break;
+    case 'capital': renderCapital(c,tb); break;
+    case 'readiness': renderReadiness(c,tb); break;
+    case 'journal': renderJournal(c,tb); break;
+    case 'psych': renderPsych(c,tb); break;
+    case 'playbook': renderPlaybook(c,tb); break;
+    case 'lessons': renderLessons(c,tb); break;
+    case 'library': renderLibrary(c,tb); break;
+    case 'casefile': renderCaseFile(c,tb); break;
+    case 'analytics': renderAnalytics(c,tb); break;
+    case 'ai': renderAI(c,tb); break;
+    case 'quarterly': renderQuarterly(c,tb); break;
+    case 'settings': renderSettings(c,tb); break;
+  }
+}
+
+function capitalPanel(m){
+  const txns=(state.capital||[]).slice().sort((a,b)=>(b.datetime||0)-(a.datetime||0)).slice(0,4);
+  return `<div class="card mb">
+    <div class="card-head"><h3>Capital</h3><span class="card-sub">deposits, withdrawals & trading P/L</span>
+      <div class="actions"><button class="btn btn-sm" onclick="go('capital')">Manage</button></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px">
+      <div><div class="k" style="font-size:11px;color:var(--txt-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Deposited</div><div class="num" style="font-size:18px;font-weight:600">${money(m.deposits)}</div></div>
+      <div><div class="k" style="font-size:11px;color:var(--txt-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Withdrawn</div><div class="num" style="font-size:18px;font-weight:600">${m.withdrawals>0?money(-m.withdrawals):money(0)}</div></div>
+      <div><div class="k" style="font-size:11px;color:var(--txt-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Net Capital</div><div class="num" style="font-size:18px;font-weight:600">${money(m.capitalBase)}</div></div>
+      <div><div class="k" style="font-size:11px;color:var(--txt-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Trading P/L</div><div class="num ${m.netTotal>=0?'pos':'neg'}" style="font-size:18px;font-weight:600">${m.netTotal>=0?'+':''}${money(m.netTotal)}</div></div>
+      <div><div class="k" style="font-size:11px;color:var(--txt-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Current Equity</div><div class="num" style="font-size:18px;font-weight:700;color:var(--accent)">${money(m.finalEquity)}</div></div>
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+function renderDashboard(c,tb){
+  const m=computeMetrics();
+  tb.innerHTML=`<button class="btn btn-sm" onclick="go('journal')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Log Trade</button>`;
+
+  if(m.n===0){
+    c.innerHTML = statRow(m) + capitalPanel(m) + `
+      <div class="card">
+        <div class="empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <p>No closed trades yet</p>
+          <span>Your equity curve and performance metrics appear here once you log trades.</span>
+          <div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="go('journal')">Log your first trade</button></div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  c.innerHTML = statRow(m) + capitalPanel(m) + `
+    <div class="dash-grid">
+      <div class="card">
+        <div class="card-head"><h3>Equity Curve</h3><span class="card-sub">${cur()} · ${m.n} trades</span></div>
+        <div class="chart-wrap"><canvas id="cEquity"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Discipline & Risk</h3></div>
+        ${scoreBlock('Discipline Score', m.disc, 'Checklist + rule compliance')}
+        <div style="height:14px"></div>
+        ${scoreBlock('Risk Control Score', m.riskScore, 'Stop discipline & risk tracking')}
+        <div class="divider"></div>
+        <div class="kvs">
+          <span class="k">Max win streak</span><span class="v pos">${m.maxWinStreak}</span>
+          <span class="k">Max loss streak</span><span class="v neg">${m.maxLossStreak}</span>
+          <span class="k">Avg win</span><span class="v pos">${money(m.avgWin)}</span>
+          <span class="k">Avg loss</span><span class="v neg">${money(-m.avgLoss)}</span>
+        </div>
+      </div>
+    </div>
+    <div class="dash-grid">
+      <div class="card">
+        <div class="card-head"><h3>Monthly P/L</h3></div>
+        <div class="chart-wrap sm"><canvas id="cMonthly"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Daily P/L (last 30)</h3></div>
+        <div class="chart-wrap sm"><canvas id="cDaily"></canvas></div>
+      </div>
+    </div>`;
+
+  drawEquity(m);
+  drawMonthly(m);
+  drawDaily(m);
+}
+
+function statRow(m){
+  const cards=[
+    {k:'Net P/L', v:moneyShort(m.netTotal), cls:m.netTotal>=0?'pos':'neg', meta:pct(m.totalReturnPct)+' return'},
+    {k:'Win Rate', v:m.n?pct(m.winRate,0):'—', cls:'', meta:`${m.wins}W / ${m.losses}L`},
+    {k:'Profit Factor', v:m.profitFactor===Infinity?'∞':m.profitFactor.toFixed(2), cls:m.profitFactor>=1?'pos':'neg', meta:'gross win ÷ loss'},
+    {k:'Expectancy', v:money(m.expectancy), cls:m.expectancy>=0?'pos':'neg', meta:m.expectancyR!=null?m.expectancyR.toFixed(2)+'R / trade':'per trade'},
+    {k:'Max Drawdown', v:moneyShort(-m.maxDD), cls:'neg', meta:pct(m.maxDDpct)+' peak'},
+    {k:'Equity', v:moneyShort(m.finalEquity), cls:'', meta:'on '+moneyShort(m.capitalBase)+' capital'},
+  ];
+  return `<div class="stat-grid">${cards.map(s=>`
+    <div class="stat">
+      <div class="k">${s.k}</div>
+      <div class="v ${s.cls}">${s.v}</div>
+      <div class="meta">${s.meta}</div>
+    </div>`).join('')}</div>`;
+}
+
+function scoreBlock(label,val,sub){
+  if(val==null) return `<div><label>${label}</label><div class="dim" style="font-size:12px">Not enough data yet</div></div>`;
+  const color = val>=75?'var(--accent)':val>=50?'var(--warn)':'var(--loss)';
+  return `<div>
+    <div class="row spread"><label style="margin:0">${label}</label><span style="font-family:var(--mono);font-weight:600;color:${color}">${val}</span></div>
+    <div class="score-bar"><div class="score-fill" style="width:${val}%;background:${color}"></div></div>
+    <div class="note-meta" style="margin-top:5px">${sub}</div>
+  </div>`;
+}
+
+/* ---------- Dashboard charts ---------- */
+const CHART_FONT = {family:"'SF Mono',ui-monospace,monospace",size:10};
+function gridColor(){return '#252d3a'}
+function baseScale(extra={}){
+  return Object.assign({
+    grid:{color:gridColor(),drawBorder:false},
+    ticks:{color:'#8a94a6',font:CHART_FONT}
+  },extra);
+}
+function drawEquity(m){
+  const ctx=$('#cEquity'); if(!ctx)return;
+  const labels=m.curve.map((p,i)=>i===0?'Start':'#'+i);
+  const data=m.curve.map(p=>p.y);
+  const grad=ctx.getContext('2d').createLinearGradient(0,0,0,300);
+  grad.addColorStop(0,'#4ade8033'); grad.addColorStop(1,'#4ade8000');
+  charts.eq=new Chart(ctx,{type:'line',data:{labels,datasets:[{data,borderColor:'#4ade80',backgroundColor:grad,fill:true,tension:.25,pointRadius:0,pointHoverRadius:4,borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>money(c.parsed.y)}}},
+    scales:{x:baseScale({ticks:{color:'#5b6577',font:CHART_FONT,maxTicksLimit:8}}),y:baseScale({ticks:{color:'#8a94a6',font:CHART_FONT,callback:v=>moneyShort(v)}})}}});
+}
+function monthlyBuckets(){
+  const map={};
+  closedTradesSorted().forEach(t=>{
+    const d=new Date(t.datetime||Date.now());
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    map[key]=(map[key]||0)+netPL(t);
+  });
+  return map;
+}
+function closedTradesSorted(){
+  return state.trades.filter(t=>(t.netPL!=null&&t.netPL!=='')||(t.grossPL!=null&&t.grossPL!=='')).sort((a,b)=>(a.datetime||0)-(b.datetime||0));
+}
+function drawMonthly(m){
+  const ctx=$('#cMonthly'); if(!ctx)return;
+  const map=monthlyBuckets();
+  const labels=Object.keys(map).sort();
+  const data=labels.map(k=>map[k]);
+  charts.mo=new Chart(ctx,{type:'bar',data:{labels:labels.map(l=>{const[y,mo]=l.split('-');return new Date(y,mo-1).toLocaleDateString(undefined,{month:'short',year:'2-digit'})}),
+    datasets:[{data,backgroundColor:data.map(v=>v>=0?'#4ade80aa':'#f87171aa'),borderColor:data.map(v=>v>=0?'#4ade80':'#f87171'),borderWidth:1,borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>money(c.parsed.y)}}},
+    scales:{x:baseScale(),y:baseScale({ticks:{color:'#8a94a6',font:CHART_FONT,callback:v=>moneyShort(v)}})}}});
+}
+function drawDaily(m){
+  const ctx=$('#cDaily'); if(!ctx)return;
+  const map={};
+  closedTradesSorted().forEach(t=>{
+    const d=new Date(t.datetime||Date.now());
+    const key=d.toISOString().slice(0,10);
+    map[key]=(map[key]||0)+netPL(t);
+  });
+  const keys=Object.keys(map).sort().slice(-30);
+  const data=keys.map(k=>map[k]);
+  charts.day=new Chart(ctx,{type:'bar',data:{labels:keys.map(k=>new Date(k).toLocaleDateString(undefined,{day:'2-digit',month:'short'})),
+    datasets:[{data,backgroundColor:data.map(v=>v>=0?'#4ade80aa':'#f87171aa'),borderColor:data.map(v=>v>=0?'#4ade80':'#f87171'),borderWidth:1,borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>money(c.parsed.y)}}},
+    scales:{x:baseScale({ticks:{color:'#5b6577',font:CHART_FONT,maxTicksLimit:10}}),y:baseScale({ticks:{color:'#8a94a6',font:CHART_FONT,callback:v=>moneyShort(v)}})}}});
+}
+/* ============================================================
+   MODAL SYSTEM
+   ============================================================ */
+function openModal(html,wide){
+  const el=$('#modalEl');
+  el.className='modal'+(wide?' wide':'');
+  el.innerHTML=html;
+  $('#modalBg').classList.add('open');
+}
+function closeModal(){ $('#modalBg').classList.remove('open'); $('#modalEl').innerHTML=''; }
+$('#modalBg').addEventListener('click',e=>{ if(e.target.id==='modalBg')closeModal(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeModal(); });
+
+function confirmDialog(msg,onYes,danger){
+  openModal(`<div class="modal-head"><h3>Confirm</h3><button class="close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body"><p style="font-size:13.5px;line-height:1.6">${esc(msg)}</p></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn ${danger?'btn-danger':'btn-primary'}" id="confirmYes">Confirm</button>
+    </div>`);
+  $('#confirmYes').onclick=()=>{closeModal();onYes();};
+}
+
+/* ============================================================
+   TRADE JOURNAL
+   ============================================================ */
+function renderJournal(c,tb){
+  tb.innerHTML=`<button class="btn btn-primary btn-sm" onclick="openTradeForm()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    New Trade</button>`;
+
+  const trades=state.trades.slice().sort((a,b)=>(b.datetime||0)-(a.datetime||0));
+  if(!trades.length){
+    c.innerHTML=`<div class="card"><div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <p>No trades logged</p><span>Capture every trade — entry, stop, exit, and the reasoning behind it.</span>
+      <div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="openTradeForm()">Log a trade</button></div>
+    </div></div>`;
+    return;
+  }
+
+  c.innerHTML=`
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="table-wrap" style="border:none">
+      <table>
+        <thead><tr>
+          <th>Date</th><th>Symbol</th><th>Dir</th><th>Strategy</th><th>Grade</th>
+          <th class="num">Entry</th><th class="num">Stop</th><th class="num">Exit</th>
+          <th class="num">Risk</th><th class="num">Net P/L</th><th class="num">R</th><th></th>
+        </tr></thead>
+        <tbody>
+        ${trades.map(t=>{
+          const p=netPL(t); const r=rMultiple(t);
+          const open=(t.netPL==null||t.netPL==='')&&(t.grossPL==null||t.grossPL==='');
+          const nLinks=(t.psychId?1:0)+((t.lessonIds||[]).length);
+          return `<tr ondblclick="openTradeForm('${t.id}')">
+            <td>${fmtDateTime(t.datetime)}</td>
+            <td style="font-weight:600">${esc(t.symbol||'—')}${nLinks?` <span class="pill" style="padding:1px 6px;font-size:9.5px" title="${nLinks} linked record(s)">🔗${nLinks}</span>`:''}<div class="note-meta">${esc(t.assetClass||'')}</div></td>
+            <td><span class="tag tag-${t.direction==='Short'?'short':'long'}">${esc(t.direction||'Long')}</span></td>
+            <td>${esc(strategyName(t.strategyId))}</td>
+            <td><span class="tag tag-grade grade-${esc(t.setupGrade||'')}">${esc(t.setupGrade||'—')}</span></td>
+            <td class="num">${t.entry?Number(t.entry).toFixed(2):'—'}</td>
+            <td class="num dim">${t.stop?Number(t.stop).toFixed(2):'—'}</td>
+            <td class="num">${t.exit?Number(t.exit).toFixed(2):'—'}</td>
+            <td class="num dim">${t.riskAmount?money(Number(t.riskAmount)):'—'}</td>
+            <td class="num ${open?'dim':p>=0?'pos':'neg'}" style="font-weight:600">${open?'OPEN':money(p)}</td>
+            <td class="num ${r==null?'dim':r>=0?'pos':'neg'}">${r==null?'—':r.toFixed(2)}</td>
+            <td class="num"><button class="btn btn-ghost btn-sm" onclick="openTradeForm('${t.id}')" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="note-meta" style="margin-top:10px;text-align:center">Double-click a row to edit · ${trades.length} trade${trades.length>1?'s':''}</div>`;
+}
+
+function strategyName(id){ const s=state.strategies.find(s=>s.id===id); return s?s.name:'—'; }
+
+function openTradeForm(id, repopulate){
+  const t = id? state.trades.find(x=>x.id===id) : null;
+  window._tradeEditId = id||'';
+  if(window._restoringTrade){
+    // keep window._tradeLessonIds as-is (set by restore)
+    window._restoringTrade=false;
+  }else{
+    window._tradeLessonIds = t && t.lessonIds ? t.lessonIds.slice() : [];
+  }
+  const isEdit=!!t;
+  const stratOpts=state.strategies.map(s=>`<option value="${s.id}" ${t&&t.strategyId===s.id?'selected':''}>${esc(s.name)}</option>`).join('');
+  openModal(`
+    <div class="modal-head"><h3>${isEdit?'Edit':'New'} Trade</h3><button class="close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field-row grid-3">
+        <div class="field"><label>Date / Time</label><input type="datetime-local" id="f_datetime" value="${t?new Date(t.datetime).toISOString().slice(0,16):todayISO()}"></div>
+        <div class="field"><label>Symbol</label><input id="f_symbol" placeholder="SPY" value="${t?esc(t.symbol):''}"></div>
+        <div class="field"><label>Asset Class</label>
+          <select id="f_assetClass">${['Equity','ETF','Option','Future','Forex','Crypto'].map(a=>`<option ${t&&t.assetClass===a?'selected':''}>${a}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="field-row grid-3">
+        <div class="field"><label>Direction</label>
+          <select id="f_direction"><option ${t&&t.direction==='Long'?'selected':''}>Long</option><option ${t&&t.direction==='Short'?'selected':''}>Short</option></select>
+        </div>
+        <div class="field"><label>Strategy</label><select id="f_strategyId"><option value="">— none —</option>${stratOpts}</select></div>
+        <div class="field"><label>Setup Grade</label>
+          <select id="f_setupGrade">${['','A','B','C','D'].map(g=>`<option value="${g}" ${t&&t.setupGrade===g?'selected':''}>${g||'—'}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="field-row grid-4">
+        <div class="field"><label>Entry</label><input type="number" step="any" id="f_entry" value="${t&&t.entry!=null?t.entry:''}"></div>
+        <div class="field"><label>Stop Loss</label><input type="number" step="any" id="f_stop" value="${t&&t.stop!=null?t.stop:''}"></div>
+        <div class="field"><label>Target</label><input type="number" step="any" id="f_target" value="${t&&t.target!=null?t.target:''}"></div>
+        <div class="field"><label>Exit</label><input type="number" step="any" id="f_exit" value="${t&&t.exit!=null?t.exit:''}"></div>
+      </div>
+      <div class="field-row grid-3">
+        <div class="field"><label>Position Size (qty)</label><input type="number" step="any" id="f_size" placeholder="shares / contracts" value="${t&&t.size!=null?t.size:''}"></div>
+        <div class="field"><label>Risk Amount (${cur()})</label><input type="number" step="any" id="f_riskAmount" placeholder="auto from entry-stop" value="${t&&t.riskAmount!=null?t.riskAmount:''}"></div>
+        <div class="field"><label>Commission (${cur()})</label><input type="number" step="any" id="f_commission" value="${t&&t.commission!=null?t.commission:''}"></div>
+      </div>
+      <div class="field-row grid-2">
+        <div class="field"><label>Gross P/L (${cur()})</label><input type="number" step="any" id="f_grossPL" placeholder="auto if exit set" value="${t&&t.grossPL!=null?t.grossPL:''}"></div>
+        <div class="field"><label>Net P/L (${cur()}) — overrides</label><input type="number" step="any" id="f_netPL" placeholder="gross − commission" value="${t&&t.netPL!=null?t.netPL:''}"></div>
+      </div>
+      <div class="field"><label>Notes / reasoning</label><textarea id="f_notes" placeholder="Why did you take this trade? What did you see?">${t?esc(t.notes):''}</textarea></div>
+      <div class="field"><label>Screenshot URL (optional)</label><input id="f_screenshot" placeholder="paste image link" value="${t&&t.screenshot?esc(t.screenshot):''}"></div>
+      <div class="note-meta">Tip: leave Risk blank to auto-calc from |entry − stop| × size. Leave Gross blank to auto-calc from exit.</div>
+
+      <div class="divider"></div>
+      <div class="note-meta" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;color:var(--txt-dim)">Linked records — build the case file</div>
+      <div class="field">
+        <label>Mindset for this trade (psychology log)</label>
+        <div class="row" style="gap:8px">
+          <select id="f_psychId" style="flex:1">
+            <option value="">— none linked —</option>
+            ${state.psych.slice().sort((a,b)=>(b.datetime||0)-(a.datetime||0)).map(p=>`<option value="${p.id}" ${t&&t.psychId===p.id?'selected':''}>${fmtDate(p.datetime)} · ${esc(p.mood||'')} · conf ${p.confidence}/stress ${p.stress}</option>`).join('')}
+          </select>
+          <button type="button" class="btn btn-sm" onclick="quickAddPsychFromTrade()">+ New</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Lessons learned from this trade (RCA)</label>
+        <div id="f_lessonsList">${renderTradeLessonLinks(t?(t.lessonIds||[]):[])}</div>
+        <div class="row" style="gap:8px;margin-top:8px">
+          <select id="f_lessonPick" style="flex:1">
+            <option value="">— pick an existing lesson to link —</option>
+            ${state.lessons.slice().sort((a,b)=>(b.created||0)-(a.created||0)).map(l=>`<option value="${l.id}">${esc((l.mistake||'Lesson').slice(0,60))}</option>`).join('')}
+          </select>
+          <button type="button" class="btn btn-sm" onclick="linkPickedLesson()">Link</button>
+          <button type="button" class="btn btn-sm" onclick="quickAddLessonFromTrade()">+ New</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      ${isEdit?`<button class="btn btn-danger" onclick="deleteTrade('${t.id}')" style="margin-right:auto">Delete</button>`:''}
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTrade('${id||''}')">${isEdit?'Save changes':'Add trade'}</button>
+    </div>`,true);
+  // Synchronous repopulate: the modal HTML is already in the DOM at this point,
+  // so we can restore field values immediately with no timing window.
+  if(repopulate){
+    Object.keys(repopulate).forEach(k=>{ if(k.startsWith('f_')){const el=$('#'+k); if(el)el.value=repopulate[k];} });
+    refreshLessonLinks();
+  }
+}
+
+function num(id){ const v=$('#'+id).value; return v===''?null:Number(v); }
+function saveTrade(id){
+  const entry=num('f_entry'),stop=num('f_stop'),exit=num('f_exit'),size=num('f_size'),dir=$('#f_direction').value;
+  let riskAmount=num('f_riskAmount');
+  if(riskAmount==null && entry!=null && stop!=null && size!=null){
+    riskAmount=Math.abs(entry-stop)*size;
+  }
+  let grossPL=num('f_grossPL');
+  if(grossPL==null && entry!=null && exit!=null && size!=null){
+    grossPL=(dir==='Short'?(entry-exit):(exit-entry))*size;
+  }
+  const data={
+    datetime:new Date($('#f_datetime').value).getTime(),
+    symbol:$('#f_symbol').value.trim().toUpperCase(),
+    assetClass:$('#f_assetClass').value, direction:dir,
+    strategyId:$('#f_strategyId').value, setupGrade:$('#f_setupGrade').value,
+    entry,stop,target:num('f_target'),exit,size,riskAmount,
+    commission:num('f_commission'), grossPL, netPL:num('f_netPL'),
+    notes:$('#f_notes').value.trim(), screenshot:$('#f_screenshot').value.trim(),
+    psychId:$('#f_psychId').value||null,
+    lessonIds:(window._tradeLessonIds||[]).slice()
+  };
+  if(!data.symbol){ toast('Symbol is required','err'); return; }
+  if(id){
+    const t=state.trades.find(x=>x.id===id);
+    Object.assign(t,data);
+    toast('Trade updated');
+  }else{
+    data.id=uid(); data.checklist=window._pendingChecklist||null; window._pendingChecklist=null;
+    state.trades.push(data);
+    toast('Trade logged');
+  }
+  save(); closeModal(); buildNav(); renderView(currentView);
+}
+function deleteTrade(id){
+  confirmDialog('Delete this trade permanently? This cannot be undone.',()=>{
+    state.trades=state.trades.filter(t=>t.id!==id);
+    save(); closeModal(); buildNav(); toast('Trade deleted','warn'); renderView(currentView);
+  },true);
+}
+
+/* ---------- Trade linkage helpers ---------- */
+function renderTradeLessonLinks(ids){
+  if(!ids||!ids.length) return `<div class="note-meta" style="padding:6px 0">No lessons linked yet.</div>`;
+  return ids.map(lid=>{
+    const l=state.lessons.find(x=>x.id===lid);
+    const label = l ? (l.mistake||'Lesson').slice(0,70) : '(deleted lesson)';
+    return `<div class="row spread" style="padding:7px 11px;border:1px solid var(--line);border-radius:7px;margin-bottom:6px">
+      <span style="font-size:12.5px;color:var(--txt-dim)">▸ ${esc(label)}</span>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="unlinkLesson('${lid}')" title="Unlink">✕</button>
+    </div>`;
+  }).join('');
+}
+function refreshLessonLinks(){
+  const el=$('#f_lessonsList'); if(el) el.innerHTML=renderTradeLessonLinks(window._tradeLessonIds);
+}
+function linkPickedLesson(){
+  const sel=$('#f_lessonPick'); const id=sel.value;
+  if(!id) return;
+  window._tradeLessonIds=window._tradeLessonIds||[];
+  if(!window._tradeLessonIds.includes(id)) window._tradeLessonIds.push(id);
+  sel.value='';
+  refreshLessonLinks();
+}
+function unlinkLesson(id){
+  window._tradeLessonIds=(window._tradeLessonIds||[]).filter(x=>x!==id);
+  refreshLessonLinks();
+}
+// Stash current trade-form values so a quick sub-form doesn't lose them
+function stashTradeForm(){
+  const ids=['f_datetime','f_symbol','f_assetClass','f_direction','f_strategyId','f_setupGrade',
+    'f_entry','f_stop','f_target','f_exit','f_size','f_riskAmount','f_commission','f_grossPL','f_netPL','f_notes','f_screenshot','f_psychId'];
+  const o={}; ids.forEach(k=>{const el=$('#'+k); if(el)o[k]=el.value;});
+  o._editId = window._tradeEditId||'';
+  o._lessonIds=(window._tradeLessonIds||[]).slice();
+  window._tradeStash=o;
+}
+function restoreTradeForm(){
+  const o=window._tradeStash; if(!o) return;
+  window._tradeLessonIds=o._lessonIds||[];
+  window._restoringTrade=true;
+  // Pass the stashed values so the form repopulates synchronously — no setTimeout.
+  openTradeForm(o._editId||undefined, o);
+}
+function quickAddPsychFromTrade(){
+  stashTradeForm();
+  window._afterPsychSave='returnToTrade';
+  openPsychForm();
+}
+function quickAddLessonFromTrade(){
+  stashTradeForm();
+  window._afterLessonSave='returnToTrade';
+  openLessonForm();
+}
+
+/* ============================================================
+   PRE-TRADE READINESS CHECKLIST
+   ============================================================ */
+let readinessState={};
+function renderReadiness(c,tb){
+  const items=state.checklistTemplate;
+  if(!Object.keys(readinessState).length) items.forEach((_,i)=>readinessState[i]=false);
+  const allChecked=items.every((_,i)=>readinessState[i]);
+  tb.innerHTML=`<button class="btn btn-ghost btn-sm" onclick="editChecklistTemplate()">Edit checklist</button>`;
+  c.innerHTML=`
+  <div style="max-width:620px;margin:0 auto">
+    <div class="card mb">
+      <div class="card-head"><h3>Pre-Trade Readiness</h3><span class="card-sub">complete all before logging</span></div>
+      <p class="note-meta" style="margin-bottom:16px">Mirror of your IT change-management gate: no go-live until every check passes. The "Log Trade" button stays locked until the list is clear.</p>
+      <div id="checklist">
+        ${items.map((it,i)=>`
+          <div class="checklist-item ${readinessState[i]?'checked':''}" onclick="toggleCheck(${i})">
+            <div class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <span>${esc(it)}</span>
+          </div>`).join('')}
+      </div>
+      <div class="divider"></div>
+      <div class="row spread">
+        <span class="note-meta">${items.filter((_,i)=>readinessState[i]).length} / ${items.length} cleared</span>
+        <div class="row" style="gap:8px">
+          <button class="btn btn-sm" onclick="resetChecklist()">Reset</button>
+          <button class="btn btn-primary btn-sm" id="readyBtn" ${allChecked?'':'disabled style="opacity:.45;cursor:not-allowed"'} onclick="proceedToTrade()">
+            ${allChecked?'Cleared — Log Trade':'Locked'}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+function toggleCheck(i){ readinessState[i]=!readinessState[i]; renderReadiness($('#viewRoot'),$('#topbarRight')); }
+function resetChecklist(){ Object.keys(readinessState).forEach(k=>readinessState[k]=false); renderReadiness($('#viewRoot'),$('#topbarRight')); }
+function proceedToTrade(){
+  // pass checklist completion snapshot to the trade
+  window._pendingChecklist=state.checklistTemplate.map((_,i)=>!!readinessState[i]);
+  resetChecklist();
+  go('journal');
+  openTradeForm();
+}
+function editChecklistTemplate(){
+  openModal(`<div class="modal-head"><h3>Edit Readiness Checklist</h3><button class="close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <p class="note-meta" style="margin-bottom:12px">One item per line.</p>
+      <textarea id="f_checklist" style="min-height:180px">${esc(state.checklistTemplate.join('\n'))}</textarea>
+    </div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="saveChecklistTemplate()">Save</button></div>`);
+}
+function saveChecklistTemplate(){
+  const lines=$('#f_checklist').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!lines.length){toast('Need at least one item','err');return;}
+  state.checklistTemplate=lines; readinessState={}; save(); closeModal();
+  toast('Checklist updated'); renderView(currentView);
+}
+/* ============================================================
+   PLAYBOOK
+   ============================================================ */
+function renderPlaybook(c,tb){
+  tb.innerHTML=`<button class="btn btn-primary btn-sm" onclick="openStrategyForm()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Strategy</button>`;
+  if(!state.strategies.length){
+    c.innerHTML=`<div class="card"><div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      <p>No strategies yet</p><span>Your playbook is your edge documented. Start with one setup you understand.</span>
+      <div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="openStrategyForm()">Create a strategy</button></div>
+    </div></div>`;
+    return;
+  }
+  c.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
+    ${state.strategies.map(s=>{
+      // performance of this strategy
+      const tr=state.trades.filter(t=>t.strategyId===s.id && ((t.netPL!=null&&t.netPL!=='')||(t.grossPL!=null&&t.grossPL!=='')));
+      const wins=tr.filter(t=>netPL(t)>0).length;
+      const wr=tr.length?(wins/tr.length*100):null;
+      const net=tr.reduce((a,t)=>a+netPL(t),0);
+      return `<div class="card">
+        <div class="card-head">
+          <h3>${esc(s.name)}</h3>
+          <span class="tag tag-grade grade-${esc(s.grade)}" style="margin-left:8px">Grade ${esc(s.grade||'—')}</span>
+          <div class="actions">
+            <button class="btn btn-ghost btn-sm" onclick="openStrategyForm('${s.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          </div>
+        </div>
+        ${s.market?`<div class="note-meta" style="margin-bottom:12px">▸ ${esc(s.market)}</div>`:''}
+        ${pbList('Entry',s.entry)}
+        ${pbList('Exit',s.exit)}
+        ${pbList('Risk',s.risk)}
+        <div class="divider"></div>
+        <div class="kvs">
+          <span class="k">Trades</span><span class="v">${tr.length}</span>
+          <span class="k">Win rate</span><span class="v ${wr==null?'dim':wr>=50?'pos':'neg'}">${wr==null?'—':pct(wr,0)}</span>
+          <span class="k">Net P/L</span><span class="v ${net>=0?'pos':'neg'}">${tr.length?money(net):'—'}</span>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+function pbList(label,arr){
+  if(!arr||!arr.length)return '';
+  return `<div style="margin-bottom:10px">
+    <div class="note-meta" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">${label}</div>
+    ${arr.map(x=>`<div style="font-size:12.5px;padding:2px 0;color:var(--txt-dim)">· ${esc(x)}</div>`).join('')}
+  </div>`;
+}
+function openStrategyForm(id){
+  const s=id?state.strategies.find(x=>x.id===id):null;
+  openModal(`<div class="modal-head"><h3>${s?'Edit':'New'} Strategy</h3><button class="close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field-row grid-2">
+        <div class="field"><label>Strategy name</label><input id="s_name" placeholder="Trend Pullback" value="${s?esc(s.name):''}"></div>
+        <div class="field"><label>Grade</label><select id="s_grade">${['A','B','C','D'].map(g=>`<option ${s&&s.grade===g?'selected':''}>${g}</option>`).join('')}</select></div>
+      </div>
+      <div class="field"><label>Market conditions</label><input id="s_market" placeholder="Trending market, above 20EMA" value="${s?esc(s.market):''}"></div>
+      <div class="field"><label>Entry checklist (one per line)</label><textarea id="s_entry">${s?esc((s.entry||[]).join('\n')):''}</textarea></div>
+      <div class="field"><label>Exit checklist (one per line)</label><textarea id="s_exit">${s?esc((s.exit||[]).join('\n')):''}</textarea></div>
+      <div class="field"><label>Risk rules (one per line)</label><textarea id="s_risk">${s?esc((s.risk||[]).join('\n')):''}</textarea></div>
+    </div>
+    <div class="modal-foot">
+      ${s?`<button class="btn btn-danger" onclick="deleteStrategy('${s.id}')" style="margin-right:auto">Delete</button>`:''}
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveStrategy('${id||''}')">${s?'Save':'Create'}</button>
+    </div>`,true);
+}
+function lines(id){ return $('#'+id).value.split('\n').map(s=>s.trim()).filter(Boolean); }
+function saveStrategy(id){
+  const name=$('#s_name').value.trim();
+  if(!name){toast('Name required','err');return;}
+  const data={name,grade:$('#s_grade').value,market:$('#s_market').value.trim(),
+    entry:lines('s_entry'),exit:lines('s_exit'),risk:lines('s_risk')};
+  if(id){Object.assign(state.strategies.find(x=>x.id===id),data);toast('Strategy updated');}
+  else{data.id=uid();data.created=Date.now();state.strategies.push(data);toast('Strategy created');}
+  save();closeModal();buildNav();renderView(currentView);
+}
+function deleteStrategy(id){
+  confirmDialog('Delete this strategy? Trades referencing it will keep their data but lose the link.',()=>{
+    state.strategies=state.strategies.filter(s=>s.id!==id);
+    save();closeModal();buildNav();toast('Strategy deleted','warn');renderView(currentView);
+  },true);
+}
+
+/* ============================================================
+   PSYCHOLOGY LOG
+   ============================================================ */
+const MOODS=['Calm','Focused','Confident','Neutral','Anxious','Fearful','Greedy','Frustrated','Revenge-prone','Bored'];
+function renderPsych(c,tb){
+  tb.innerHTML=`<button class="btn btn-primary btn-sm" onclick="openPsychForm()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Entry</button>`;
+  const entries=state.psych.slice().sort((a,b)=>(b.datetime||0)-(a.datetime||0));
+  if(!entries.length){
+    c.innerHTML=`<div class="card"><div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44"/></svg>
+      <p>No psychology entries</p><span>Track confidence, stress, and energy. Your mental state is a leading indicator of your P/L.</span>
+      <div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="openPsychForm()">Log how you feel</button></div>
+    </div></div>`;
+    return;
+  }
+  c.innerHTML=`<div class="table-wrap"><table>
+    <thead><tr><th>Date</th><th>State</th><th class="num">Confidence</th><th class="num">Stress</th><th class="num">Energy</th><th>Followed rules?</th><th>Note</th><th></th></tr></thead>
+    <tbody>${entries.map(p=>`<tr ondblclick="openPsychForm('${p.id}')">
+      <td>${fmtDateTime(p.datetime)}</td>
+      <td><span class="pill">${esc(p.mood||'—')}</span></td>
+      <td class="num">${scoreCell(p.confidence)}</td>
+      <td class="num">${scoreCell(p.stress,true)}</td>
+      <td class="num">${scoreCell(p.energy)}</td>
+      <td>${p.compliance==='yes'?'<span class="pos">✓ Yes</span>':p.compliance==='no'?'<span class="neg">✗ No</span>':'<span class="dim">—</span>'}</td>
+      <td style="white-space:normal;max-width:240px;color:var(--txt-dim)">${esc((p.note||'').slice(0,80))}</td>
+      <td class="num"><button class="btn btn-ghost btn-sm" onclick="openPsychForm('${p.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+function scoreCell(v,inverse){
+  if(v==null)return '<span class="dim">—</span>';
+  const good=inverse?(v<=4):(v>=7);
+  const bad=inverse?(v>=7):(v<=4);
+  const cls=good?'pos':bad?'neg':'';
+  return `<span class="${cls}">${v}</span>`;
+}
+function openPsychForm(id){
+  const p=id?state.psych.find(x=>x.id===id):null;
+  const slider=(lab,key,val)=>`<div class="field"><label>${lab}: <span class="range-val" id="rv_${key}">${val}</span>/10</label>
+    <input type="range" min="1" max="10" id="p_${key}" value="${val}" oninput="document.getElementById('rv_${key}').textContent=this.value"></div>`;
+  openModal(`<div class="modal-head"><h3>${p?'Edit':'New'} Psychology Entry</h3><button class="close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Date / Time</label><input type="datetime-local" id="p_datetime" value="${p?new Date(p.datetime).toISOString().slice(0,16):todayISO()}"></div>
+      ${slider('Confidence','confidence',p?p.confidence:5)}
+      ${slider('Stress','stress',p?p.stress:5)}
+      ${slider('Energy','energy',p?p.energy:5)}
+      <div class="field"><label>Emotional state</label><select id="p_mood">${MOODS.map(m=>`<option ${p&&p.mood===m?'selected':''}>${m}</option>`).join('')}</select></div>
+      <div class="field"><label>Did you follow your rules today?</label>
+        <select id="p_compliance"><option value="">—</option><option value="yes" ${p&&p.compliance==='yes'?'selected':''}>Yes, fully</option><option value="no" ${p&&p.compliance==='no'?'selected':''}>No, I broke rules</option></select></div>
+      <div class="field"><label>Reflection</label><textarea id="p_note" placeholder="What affected your state today?">${p?esc(p.note):''}</textarea></div>
+    </div>
+    <div class="modal-foot">
+      ${p?`<button class="btn btn-danger" onclick="deletePsych('${p.id}')" style="margin-right:auto">Delete</button>`:''}
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="savePsych('${id||''}')">${p?'Save':'Add'}</button>
+    </div>`);
+}
+function savePsych(id){
+  const data={datetime:new Date($('#p_datetime').value).getTime(),
+    confidence:Number($('#p_confidence').value),stress:Number($('#p_stress').value),
+    energy:Number($('#p_energy').value),mood:$('#p_mood').value,
+    compliance:$('#p_compliance').value,note:$('#p_note').value.trim()};
+  let newId=id;
+  if(id){Object.assign(state.psych.find(x=>x.id===id),data);toast('Entry updated');}
+  else{data.id=uid();newId=data.id;state.psych.push(data);toast('Entry added');}
+  save();buildNav();
+  if(window._afterPsychSave==='returnToTrade'){
+    window._afterPsychSave=null;
+    if(window._tradeStash) window._tradeStash.f_psychId=newId;
+    closeModal();
+    restoreTradeForm();
+    return;
+  }
+  closeModal();renderView(currentView);
+}
+function deletePsych(id){
+  confirmDialog('Delete this psychology entry? Any trade linked to it will lose that link.',()=>{
+    state.psych=state.psych.filter(p=>p.id!==id);
+    state.trades.forEach(t=>{ if(t.psychId===id) t.psychId=null; });
+    save();closeModal();buildNav();toast('Deleted','warn');renderView(currentView);
+  },true);
+}
+
+/* ============================================================
+   LESSONS LEARNED (RCA)
+   ============================================================ */
+function renderLessons(c,tb){
+  tb.innerHTML=`<button class="btn btn-primary btn-sm" onclick="openLessonForm()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Lesson</button>`;
+  const items=state.lessons.slice().sort((a,b)=>(b.created||0)-(a.created||0));
+  if(!items.length){
+    c.innerHTML=`<div class="card"><div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      <p>No lessons logged</p><span>Root-cause analysis for trading. Every mistake becomes a documented prevention rule — just like an incident postmortem.</span>
+      <div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="openLessonForm()">Log a lesson</button></div>
+    </div></div>`;
+    return;
+  }
+  c.innerHTML=`<div style="max-width:820px">${items.map(l=>`
+    <div class="lesson-card">
+      <div class="row spread">
+        <div class="row" style="gap:8px"><span class="pill" style="border-color:#3a2630;color:var(--loss)">${esc(l.category||'Mistake')}</span><span class="note-meta">${fmtDate(l.created)}</span></div>
+        <button class="btn btn-ghost btn-sm" onclick="openLessonForm('${l.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+      </div>
+      <div style="margin-top:10px;display:grid;gap:8px">
+        <div><span class="note-meta" style="text-transform:uppercase">Mistake</span><div style="font-size:13px">${esc(l.mistake)}</div></div>
+        <div><span class="note-meta" style="text-transform:uppercase">Root cause</span><div style="font-size:13px;color:var(--txt-dim)">${esc(l.rootCause)}</div></div>
+        <div><span class="note-meta" style="text-transform:uppercase">Resolution</span><div style="font-size:13px;color:var(--txt-dim)">${esc(l.resolution)}</div></div>
+        <div><span class="note-meta" style="text-transform:uppercase;color:var(--accent)">Prevention</span><div style="font-size:13px;color:var(--accent)">${esc(l.prevention)}</div></div>
+      </div>
+      ${(()=>{const lt=tradesLinkingLesson(l.id);return lt.length?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line-soft)"><span class="note-meta" style="text-transform:uppercase">Linked from ${lt.length} trade${lt.length>1?'s':''}</span><div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:6px">${lt.map(t=>`<span class="pill" style="cursor:pointer" onclick="openTradeForm('${t.id}')">${tradeLabel(t)}</span>`).join('')}</div></div>`:'';})()}
+    </div>`).join('')}</div>`;
+}
+function openLessonForm(id){
+  const l=id?state.lessons.find(x=>x.id===id):null;
+  openModal(`<div class="modal-head"><h3>${l?'Edit':'New'} Lesson (RCA)</h3><button class="close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Category</label><select id="l_category">${['Mistake','Process Gap','Emotional','Risk Breach','Market Read','Execution'].map(x=>`<option ${l&&l.category===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="field"><label>What happened (the mistake)</label><textarea id="l_mistake" placeholder="Moved my stop loss further away to avoid being stopped out">${l?esc(l.mistake):''}</textarea></div>
+      <div class="field"><label>Root cause (the why)</label><textarea id="l_rootCause" placeholder="Couldn't accept being wrong — ego over process">${l?esc(l.rootCause):''}</textarea></div>
+      <div class="field"><label>Resolution (what I did / should have done)</label><textarea id="l_resolution" placeholder="Closed at a larger loss than planned">${l?esc(l.resolution):''}</textarea></div>
+      <div class="field"><label>Prevention (the new rule)</label><textarea id="l_prevention" placeholder="Stops are mechanical — never widened once set. Use a hard bracket order.">${l?esc(l.prevention):''}</textarea></div>
+    </div>
+    <div class="modal-foot">
+      ${l?`<button class="btn btn-danger" onclick="deleteLesson('${l.id}')" style="margin-right:auto">Delete</button>`:''}
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveLesson('${id||''}')">${l?'Save':'Add'}</button>
+    </div>`,true);
+}
+function saveLesson(id){
+  const data={category:$('#l_category').value,mistake:$('#l_mistake').value.trim(),
+    rootCause:$('#l_rootCause').value.trim(),resolution:$('#l_resolution').value.trim(),
+    prevention:$('#l_prevention').value.trim()};
+  if(!data.mistake){toast('Describe the mistake','err');return;}
+  let newId=id;
+  if(id){Object.assign(state.lessons.find(x=>x.id===id),data);toast('Lesson updated');}
+  else{data.id=uid();newId=data.id;data.created=Date.now();state.lessons.push(data);toast('Lesson logged');}
+  save();buildNav();
+  if(window._afterLessonSave==='returnToTrade'){
+    window._afterLessonSave=null;
+    if(window._tradeStash){
+      window._tradeStash._lessonIds=window._tradeStash._lessonIds||[];
+      if(!window._tradeStash._lessonIds.includes(newId)) window._tradeStash._lessonIds.push(newId);
+    }
+    closeModal();
+    restoreTradeForm();
+    return;
+  }
+  closeModal();renderView(currentView);
+}
+function deleteLesson(id){
+  confirmDialog('Delete this lesson? Any trade linked to it will lose that link.',()=>{
+    state.lessons=state.lessons.filter(l=>l.id!==id);
+    state.trades.forEach(t=>{ if(Array.isArray(t.lessonIds)) t.lessonIds=t.lessonIds.filter(x=>x!==id); });
+    save();closeModal();buildNav();toast('Deleted','warn');renderView(currentView);
+  },true);
+}
+
+/* ---------- Reverse-link helpers ---------- */
+function tradesLinkingLesson(lessonId){
+  return state.trades.filter(t=>t.lessonIds && t.lessonIds.includes(lessonId));
+}
+function tradeLinkingPsych(psychId){
+  return state.trades.find(t=>t.psychId===psychId);
+}
+function tradeLabel(t){
+  if(!t) return '';
+  const p=netPL(t);
+  return `${esc(t.symbol||'—')} · ${fmtDate(t.datetime)} · ${p>=0?'+':''}${p.toFixed(0)}`;
+}
+
+/* ============================================================
+   CASE FILE  — connected view of trade + psychology + lessons
+   ============================================================ */
+let caseFilter='linked';
+function renderCaseFile(c,tb){
+  tb.innerHTML=`<button class="btn btn-sm ${caseFilter==='linked'?'btn-primary':''}" onclick="setCaseFilter('linked')">Linked only</button>
+    <button class="btn btn-sm ${caseFilter==='all'?'btn-primary':''}" onclick="setCaseFilter('all')">All trades</button>`;
+  let trades=state.trades.slice().sort((a,b)=>(b.datetime||0)-(a.datetime||0));
+  if(caseFilter==='linked') trades=trades.filter(t=>t.psychId||(t.lessonIds&&t.lessonIds.length));
+  if(!trades.length){
+    c.innerHTML=`<div class="card"><div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h6l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>
+      <p>${caseFilter==='linked'?'No linked trades yet':'No trades yet'}</p>
+      <span>${caseFilter==='linked'?'Open a trade and link its mindset (psychology) and any lessons. They\'ll assemble into a case file here.':'Log a trade to begin.'}</span>
+      ${caseFilter==='linked'&&state.trades.length?`<div style="margin-top:16px"><button class="btn btn-sm" onclick="setCaseFilter('all')">Show all trades</button></div>`:''}
+    </div></div>`;
+    return;
+  }
+  c.innerHTML=`<div class="note-meta" style="margin-bottom:14px">Each card connects a trade to the mindset you were in and the lessons it produced — one continuous record, the way an incident review ties together symptom, cause and fix.</div>
+  <div style="display:grid;gap:16px;max-width:880px">
+  ${trades.map(t=>{
+    const p=netPL(t),r=rMultiple(t);
+    const open=(t.netPL==null||t.netPL==='')&&(t.grossPL==null||t.grossPL==='');
+    const psych=t.psychId?state.psych.find(x=>x.id===t.psychId):null;
+    const lessons=(t.lessonIds||[]).map(id=>state.lessons.find(l=>l.id===id)).filter(Boolean);
+    return `<div class="card">
+      <div class="row spread wrap" style="gap:10px">
+        <div class="row" style="gap:10px">
+          <span style="font-weight:600;font-size:15px">${esc(t.symbol||'—')}</span>
+          <span class="tag tag-${t.direction==='Short'?'short':'long'}">${esc(t.direction||'Long')}</span>
+          ${t.setupGrade?`<span class="tag tag-grade grade-${esc(t.setupGrade)}">${esc(t.setupGrade)}</span>`:''}
+          <span class="note-meta">${fmtDateTime(t.datetime)}</span>
+        </div>
+        <div class="row" style="gap:14px">
+          <span class="num ${open?'dim':p>=0?'pos':'neg'}" style="font-weight:600">${open?'OPEN':money(p)}</span>
+          ${r!=null?`<span class="num ${r>=0?'pos':'neg'}">${r.toFixed(2)}R</span>`:''}
+          <button class="btn btn-ghost btn-sm" onclick="openTradeForm('${t.id}')">Edit</button>
+        </div>
+      </div>
+      ${t.strategyId?`<div class="note-meta" style="margin-top:6px">Strategy: ${esc(strategyName(t.strategyId))}</div>`:''}
+      ${t.notes?`<div style="font-size:12.5px;color:var(--txt-dim);margin-top:8px">${esc(t.notes)}</div>`:''}
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px" class="cf-cols">
+        <div style="border:1px solid var(--line);border-radius:9px;padding:12px">
+          <div class="note-meta" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Mindset</div>
+          ${psych?`
+            <div class="row wrap" style="gap:6px;margin-bottom:8px"><span class="pill">${esc(psych.mood||'—')}</span>${psych.compliance==='yes'?'<span class="pill" style="color:var(--accent);border-color:#1d3a28">followed rules</span>':psych.compliance==='no'?'<span class="pill" style="color:var(--loss);border-color:#3a2630">broke rules</span>':''}</div>
+            <div class="kvs" style="grid-template-columns:auto 1fr">
+              <span class="k">Confidence</span><span class="v">${psych.confidence}/10</span>
+              <span class="k">Stress</span><span class="v">${psych.stress}/10</span>
+              <span class="k">Energy</span><span class="v">${psych.energy}/10</span>
+            </div>
+            ${psych.note?`<div style="font-size:12px;color:var(--txt-dim);margin-top:8px">${esc(psych.note)}</div>`:''}
+          `:`<div class="note-meta" style="padding:4px 0">No mindset linked. <span style="color:var(--info);cursor:pointer" onclick="openTradeForm('${t.id}')">Link one</span></div>`}
+        </div>
+        <div style="border:1px solid var(--line);border-radius:9px;padding:12px">
+          <div class="note-meta" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Lessons (RCA)</div>
+          ${lessons.length?lessons.map(l=>`
+            <div style="margin-bottom:10px">
+              <div style="font-size:12.5px;font-weight:600">${esc((l.mistake||'').slice(0,90))}</div>
+              ${l.prevention?`<div style="font-size:12px;color:var(--accent);margin-top:3px">→ ${esc(l.prevention)}</div>`:''}
+            </div>`).join(''):`<div class="note-meta" style="padding:4px 0">No lessons linked. <span style="color:var(--info);cursor:pointer" onclick="openTradeForm('${t.id}')">Add one</span></div>`}
+        </div>
+      </div>
+    </div>`;
+  }).join('')}
+  </div>`;
+}
+function setCaseFilter(f){ caseFilter=f; renderView('casefile'); }
+
+/* ============================================================
+   STUDY LIBRARY
+   ============================================================ */
+/* ============================================================
+   STUDY LIBRARY  (+ collapsible operational checklists)
+   ============================================================ */
+// The operational checklists now live in state.opsChecklists (seeded from defaultOpsChecklists()).
+// Tick-state remains keyed by item id in state.opsChecklist.
+
+function opsLists(){ return state.opsChecklists || []; }
+function opsChecklistProgress(){
+  let done=0,total=0;
+  opsLists().forEach(cl=>cl.groups.forEach(g=>g.items.forEach(it=>{
+    total++; if(state.opsChecklist&&state.opsChecklist[it.id])done++;
+  })));
+  return {done,total};
+}
+function toggleOpsItem(itemId){
+  if(!state.opsChecklist)state.opsChecklist={};
+  state.opsChecklist[itemId]=!state.opsChecklist[itemId];
+  save();
+  renderView('library');
+}
+function resetOpsChecklist(which){
+  confirmDialog(which==='all'?'Clear all checklist ticks?':'Clear ticks for this checklist?',()=>{
+    if(which==='all'){ state.opsChecklist={}; }
+    else{
+      const cl=opsLists().find(c=>c.id===which);
+      if(cl)cl.groups.forEach(g=>g.items.forEach(it=>{ delete state.opsChecklist[it.id]; }));
+    }
+    save();renderView('library');
+  },false);
+}
+let opsExpanded=false; // collapsed by default
+let opsEditMode=false;
+function toggleOpsSection(){ opsExpanded=!opsExpanded; renderView('library'); }
+function toggleOpsEdit(){ opsEditMode=!opsEditMode; if(!opsExpanded)opsExpanded=true; renderView('library'); }
+
+/* ---------- Edit operations ---------- */
+function addOpsItem(listId,groupId){
+  const txt=prompt('New checklist item:');
+  if(!txt||!txt.trim())return;
+  const cl=opsLists().find(c=>c.id===listId); if(!cl)return;
+  const g=cl.groups.find(x=>x.id===groupId); if(!g)return;
+  g.items.push({id:'i'+uid(),t:txt.trim()});
+  save();renderView('library');
+}
+function editOpsItem(listId,groupId,itemId){
+  const cl=opsLists().find(c=>c.id===listId); if(!cl)return;
+  const g=cl.groups.find(x=>x.id===groupId); if(!g)return;
+  const it=g.items.find(x=>x.id===itemId); if(!it)return;
+  const txt=prompt('Edit checklist item:',it.t);
+  if(txt==null)return;
+  if(!txt.trim()){toast('Item cannot be empty','err');return;}
+  it.t=txt.trim(); save();renderView('library');
+}
+function deleteOpsItem(listId,groupId,itemId){
+  const cl=opsLists().find(c=>c.id===listId); if(!cl)return;
+  const g=cl.groups.find(x=>x.id===groupId); if(!g)return;
+  g.items=g.items.filter(x=>x.id!==itemId);
+  if(state.opsChecklist) delete state.opsChecklist[itemId];
+  save();renderView('library');
+}
+function addOpsGroup(listId){
+  const name=prompt('New section name:');
+  if(!name||!name.trim())return;
+  const cl=opsLists().find(c=>c.id===listId); if(!cl)return;
+  cl.groups.push({id:'g'+uid(),name:name.trim(),items:[]});
+  save();renderView('library');
+}
+function editOpsGroup(listId,groupId){
+  const cl=opsLists().find(c=>c.id===listId); if(!cl)return;
+  const g=cl.groups.find(x=>x.id===groupId); if(!g)return;
+  const name=prompt('Edit section name:',g.name);
+  if(name==null)return; if(!name.trim()){toast('Name cannot be empty','err');return;}
+  g.name=name.trim(); save();renderView('library');
+}
+function deleteOpsGroup(listId,groupId){
+  const cl=opsLists().find(c=>c.id===listId); if(!cl)return;
+  const g=cl.groups.find(x=>x.id===groupId); if(!g)return;
+  confirmDialog(`Delete section "${g.name}" and its ${g.items.length} item(s)?`,()=>{
+    g.items.forEach(it=>{ if(state.opsChecklist)delete state.opsChecklist[it.id]; });
+    cl.groups=cl.groups.filter(x=>x.id!==groupId);
+    save();renderView('library');
+  },true);
+}
+function addOpsList(){
+  const title=prompt('New checklist title:');
+  if(!title||!title.trim())return;
+  const sub=prompt('Subtitle / cadence (optional, e.g. "daily"):')||'';
+  state.opsChecklists.push({id:'c'+uid(),title:title.trim(),sub:sub.trim(),groups:[{id:'g'+uid(),name:'Items',items:[]}]});
+  save();renderView('library');
+}
+function editOpsListMeta(listId){
+  const cl=opsLists().find(c=>c.id===listId); if(!cl)return;
+  const title=prompt('Edit checklist title:',cl.title);
+  if(title==null)return; if(!title.trim()){toast('Title cannot be empty','err');return;}
+  const sub=prompt('Edit subtitle / cadence:',cl.sub||'');
+  cl.title=title.trim(); if(sub!=null)cl.sub=sub.trim();
+  save();renderView('library');
+}
+function deleteOpsList(listId){
+  const cl=opsLists().find(c=>c.id===listId); if(!cl)return;
+  confirmDialog(`Delete the entire "${cl.title}" checklist?`,()=>{
+    cl.groups.forEach(g=>g.items.forEach(it=>{ if(state.opsChecklist)delete state.opsChecklist[it.id]; }));
+    state.opsChecklists=state.opsChecklists.filter(x=>x.id!==listId);
+    save();renderView('library');
+  },true);
+}
+function restoreDefaultChecklists(){
+  confirmDialog('Restore the original daily & weekly checklists? This replaces your current checklist structure (your ticks are cleared).',()=>{
+    state.opsChecklists=defaultOpsChecklists(); state.opsChecklist={};
+    save();renderView('library');
+  },false);
+}
+
+const PENCIL_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+
+function renderOpsChecklistSection(){
+  const {done,total}=opsChecklistProgress();
+  const pctVal=total?Math.round(done/total*100):0;
+  return `<div class="card mb" style="padding:0;overflow:hidden">
+    <div class="row spread" style="padding:16px 18px;user-select:none">
+      <div class="row" style="gap:11px;cursor:pointer;flex:1" onclick="toggleOpsSection()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:17px;height:17px;color:var(--txt-faint);transform:rotate(${opsExpanded?90:0}deg);transition:transform .18s"><polyline points="9 18 15 12 9 6"/></svg>
+        <div>
+          <h3 style="font-size:14px;font-weight:600">Operational Checklists</h3>
+          <div class="note-meta" style="margin-top:2px">Daily routine & weekly QA · tap to ${opsExpanded?'collapse':'expand'}</div>
+        </div>
+      </div>
+      <div class="row" style="gap:8px">
+        ${opsExpanded?`<button class="btn btn-sm ${opsEditMode?'btn-primary':''}" onclick="toggleOpsEdit()">${opsEditMode?'Done':'Edit'}</button>`:''}
+        <span class="pill" style="${pctVal===100&&total>0?'color:var(--accent);border-color:#1d3a28':''}">${done}/${total} done</span>
+      </div>
+    </div>
+    ${opsExpanded?`<div style="padding:0 18px 18px;border-top:1px solid var(--line-soft)">
+      ${opsEditMode?`<div class="note-meta" style="margin-top:12px;padding:8px 11px;background:var(--ink);border:1px solid var(--line);border-radius:7px">Edit mode: add, rename or remove items, sections and whole checklists. Tap an item's text to rename it.</div>`:''}
+      ${opsLists().map(cl=>{
+        const cd=cl.groups.reduce((a,g)=>a+g.items.filter(it=>state.opsChecklist&&state.opsChecklist[it.id]).length,0);
+        const ct=cl.groups.reduce((a,g)=>a+g.items.length,0);
+        return `<div style="margin-top:18px">
+          <div class="row spread" style="margin-bottom:10px">
+            <div class="section-title" style="margin:0">${esc(cl.title)} ${cl.sub?`<span class="note-meta" style="text-transform:none;letter-spacing:0">· ${esc(cl.sub)}</span>`:''}</div>
+            <div class="row" style="gap:6px">
+              ${opsEditMode
+                ? `<button class="btn btn-ghost btn-sm" onclick="editOpsListMeta('${cl.id}')" title="Rename checklist">${PENCIL_SVG}</button>
+                   <button class="btn btn-ghost btn-sm" onclick="deleteOpsList('${cl.id}')" title="Delete checklist" style="color:var(--loss)">✕</button>`
+                : `<span class="note-meta">${cd}/${ct}</span><button class="btn btn-ghost btn-sm" onclick="resetOpsChecklist('${cl.id}')">Reset</button>`}
+            </div>
+          </div>
+          ${cl.groups.map(g=>`
+            <div style="margin-bottom:12px">
+              <div class="row spread" style="margin-bottom:6px">
+                <div class="note-meta" style="text-transform:uppercase;letter-spacing:.05em">${esc(g.name)}</div>
+                ${opsEditMode?`<div class="row" style="gap:4px">
+                  <button class="btn btn-ghost btn-sm" onclick="editOpsGroup('${cl.id}','${g.id}')" title="Rename section">${PENCIL_SVG}</button>
+                  <button class="btn btn-ghost btn-sm" onclick="deleteOpsGroup('${cl.id}','${g.id}')" title="Delete section" style="color:var(--loss)">✕</button>
+                </div>`:''}
+              </div>
+              ${g.items.map(it=>{
+                const on=state.opsChecklist&&state.opsChecklist[it.id];
+                if(opsEditMode){
+                  return `<div class="row spread" style="padding:8px 11px;border:1px solid var(--line);border-radius:7px;margin-bottom:6px">
+                    <span style="font-size:12.5px;color:var(--txt-dim);cursor:pointer;flex:1" onclick="editOpsItem('${cl.id}','${g.id}','${it.id}')">${esc(it.t)}</span>
+                    <button class="btn btn-ghost btn-sm" onclick="deleteOpsItem('${cl.id}','${g.id}','${it.id}')" title="Delete item" style="color:var(--loss)">✕</button>
+                  </div>`;
+                }
+                return `<div class="checklist-item ${on?'checked':''}" onclick="toggleOpsItem('${it.id}')" style="margin-bottom:6px">
+                  <div class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+                  <span style="font-size:12.5px">${esc(it.t)}</span>
+                </div>`;
+              }).join('')}
+              ${opsEditMode?`<button class="btn btn-sm" onclick="addOpsItem('${cl.id}','${g.id}')" style="margin-top:2px">+ Add item</button>`:''}
+            </div>`).join('')}
+          ${opsEditMode?`<button class="btn btn-sm" onclick="addOpsGroup('${cl.id}')">+ Add section</button>`:''}
+        </div>`;
+      }).join('')}
+      <div class="row spread wrap" style="margin-top:16px;gap:8px">
+        <div class="row" style="gap:8px">
+          ${opsEditMode?`<button class="btn btn-sm" onclick="addOpsList()">+ New checklist</button>
+          <button class="btn btn-sm" onclick="restoreDefaultChecklists()">Restore defaults</button>`:''}
+        </div>
+        ${!opsEditMode?`<button class="btn btn-sm" onclick="resetOpsChecklist('all')">Clear all ticks</button>`:''}
+      </div>
+    </div>`:''}
+  </div>`;
+}
+
+function renderLibrary(c,tb){
+  tb.innerHTML=`<button class="btn btn-primary btn-sm" onclick="openLibForm()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Resource</button>`;
+  const items=state.library.slice().sort((a,b)=>(b.created||0)-(a.created||0));
+  const ops=renderOpsChecklistSection();
+  if(!items.length){
+    c.innerHTML=ops+`<div class="card"><div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20"/></svg>
+      <p>No resources yet</p><span>Books, videos, notes and research in one place. Start with Trading in the Zone.</span>
+      <div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="openLibForm()">Add a resource</button></div>
+    </div></div>`;
+    return;
+  }
+  c.innerHTML=ops+`<div class="section-title" style="margin-top:4px">Resources</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">${items.map(r=>`
+    <div class="lib-card">
+      <div class="row spread"><span class="pill">${esc(r.type)}</span>
+        <button class="btn btn-ghost btn-sm" onclick="openLibForm('${r.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+      </div>
+      <div style="font-weight:600;margin:8px 0 2px">${esc(r.title)}</div>
+      ${r.author?`<div class="note-meta">${esc(r.author)}</div>`:''}
+      ${r.note?`<div style="font-size:12.5px;color:var(--txt-dim);margin-top:8px">${esc(r.note)}</div>`:''}
+      ${r.url?`<div style="margin-top:8px"><a href="${esc(r.url)}" target="_blank" rel="noopener" style="color:var(--info);font-size:12px;text-decoration:none">Open link ↗</a></div>`:''}
+      ${r.type==='Book'?`<div class="bookprog">${[1,2,3,4,5].map(s=>`<div class="seg ${(r.progress||0)>=s*20?'on':''}"></div>`).join('')}</div><div class="note-meta" style="margin-top:4px">${r.progress||0}% read</div>`:''}
+    </div>`).join('')}</div>`;
+}
+function openLibForm(id){
+  const r=id?state.library.find(x=>x.id===id):null;
+  openModal(`<div class="modal-head"><h3>${r?'Edit':'Add'} Resource</h3><button class="close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field-row grid-2">
+        <div class="field"><label>Type</label><select id="r_type" onchange="document.getElementById('progWrap').style.display=this.value==='Book'?'block':'none'">${['Book','Video','Article','Note','Research'].map(x=>`<option ${r&&r.type===x?'selected':''}>${x}</option>`).join('')}</select></div>
+        <div class="field"><label>Author / source</label><input id="r_author" value="${r?esc(r.author):''}"></div>
+      </div>
+      <div class="field"><label>Title</label><input id="r_title" placeholder="Trading in the Zone" value="${r?esc(r.title):''}"></div>
+      <div class="field"><label>URL (optional)</label><input id="r_url" value="${r&&r.url?esc(r.url):''}"></div>
+      <div class="field" id="progWrap" style="display:${(!r||r.type==='Book')?'block':'none'}"><label>Reading progress: <span id="rv_prog">${r?r.progress||0:0}</span>%</label>
+        <input type="range" min="0" max="100" step="10" id="r_progress" value="${r?r.progress||0:0}" oninput="document.getElementById('rv_prog').textContent=this.value"></div>
+      <div class="field"><label>Notes / key takeaways</label><textarea id="r_note">${r?esc(r.note):''}</textarea></div>
+    </div>
+    <div class="modal-foot">
+      ${r?`<button class="btn btn-danger" onclick="deleteLib('${r.id}')" style="margin-right:auto">Delete</button>`:''}
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveLib('${id||''}')">${r?'Save':'Add'}</button>
+    </div>`);
+}
+function saveLib(id){
+  const data={type:$('#r_type').value,author:$('#r_author').value.trim(),title:$('#r_title').value.trim(),
+    url:$('#r_url').value.trim(),progress:Number($('#r_progress').value),note:$('#r_note').value.trim()};
+  if(!data.title){toast('Title required','err');return;}
+  if(id){Object.assign(state.library.find(x=>x.id===id),data);toast('Updated');}
+  else{data.id=uid();data.created=Date.now();state.library.push(data);toast('Added to library');}
+  save();closeModal();buildNav();renderView(currentView);
+}
+function deleteLib(id){
+  confirmDialog('Remove this resource?',()=>{state.library=state.library.filter(r=>r.id!==id);save();closeModal();buildNav();toast('Removed','warn');renderView(currentView);},true);
+}
+/* ============================================================
+   ANALYTICS
+   ============================================================ */
+function renderAnalytics(c,tb){
+  const closed=closedTradesSorted();
+  if(!closed.length){
+    c.innerHTML=`<div class="card"><div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <p>No data to analyze</p><span>Log a few closed trades and breakdowns by setup, weekday and hour appear here.</span>
+    </div></div>`;
+    return;
+  }
+  const m=computeMetrics();
+  c.innerHTML=`
+  <div class="stat-grid">
+    ${miniStat('Profit Factor',m.profitFactor===Infinity?'∞':m.profitFactor.toFixed(2),m.profitFactor>=1?'pos':'neg')}
+    ${miniStat('Expectancy',money(m.expectancy),m.expectancy>=0?'pos':'neg')}
+    ${miniStat('Avg R/R', avgRR(closed),'')}
+    ${miniStat('Max Win Streak',m.maxWinStreak,'pos')}
+    ${miniStat('Max Loss Streak',m.maxLossStreak,'neg')}
+    ${miniStat('Expectancy (R)',m.expectancyR!=null?m.expectancyR.toFixed(2)+'R':'—',m.expectancyR>=0?'pos':'neg')}
+  </div>
+  <div class="dash-grid">
+    <div class="card"><div class="card-head"><h3>Win Rate by Setup Grade</h3></div><div class="chart-wrap sm"><canvas id="aSetup"></canvas></div></div>
+    <div class="card"><div class="card-head"><h3>Win Rate by Strategy</h3></div><div class="chart-wrap sm"><canvas id="aStrat"></canvas></div></div>
+  </div>
+  <div class="dash-grid">
+    <div class="card"><div class="card-head"><h3>Performance by Weekday</h3></div><div class="chart-wrap sm"><canvas id="aDow"></canvas></div></div>
+    <div class="card"><div class="card-head"><h3>Performance by Hour</h3></div><div class="chart-wrap sm"><canvas id="aHour"></canvas></div></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h3>R-Multiple Distribution</h3><span class="card-sub">how big are wins vs losses</span></div>
+    <div class="chart-wrap sm"><canvas id="aR"></canvas></div>
+  </div>`;
+  drawSetupChart(closed);
+  drawStratChart(closed);
+  drawDowChart(closed);
+  drawHourChart(closed);
+  drawRChart(closed);
+}
+function miniStat(k,v,cls){return `<div class="stat"><div class="k">${k}</div><div class="v ${cls}">${v}</div></div>`;}
+function avgRR(closed){
+  const rs=closed.map(rMultiple).filter(r=>r!=null);
+  if(!rs.length)return '—';
+  const wins=rs.filter(r=>r>0),losses=rs.filter(r=>r<0);
+  if(!wins.length||!losses.length)return '—';
+  const aw=wins.reduce((a,b)=>a+b,0)/wins.length;
+  const al=Math.abs(losses.reduce((a,b)=>a+b,0)/losses.length);
+  return '1 : '+(aw/al).toFixed(2);
+}
+function winRateBars(groups){
+  // groups: {label:[trades]}
+  const labels=Object.keys(groups);
+  const wr=labels.map(k=>{const t=groups[k];const w=t.filter(x=>netPL(x)>0).length;return t.length?w/t.length*100:0;});
+  const counts=labels.map(k=>groups[k].length);
+  return {labels,wr,counts};
+}
+function barChart(ctxId,labels,data,counts,fmt){
+  const ctx=$('#'+ctxId);if(!ctx)return;
+  charts[ctxId]=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data,
+    backgroundColor:data.map(v=>v>=50?'#4ade80aa':'#fbbf24aa'),borderColor:data.map(v=>v>=50?'#4ade80':'#fbbf24'),borderWidth:1,borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>(fmt?fmt(c.parsed.y):c.parsed.y.toFixed(0)+'%')+(counts?'  ·  '+counts[c.dataIndex]+' trades':'')}}},
+    scales:{x:baseScale(),y:baseScale({min:0,max:fmt?undefined:100,ticks:{color:'#8a94a6',font:CHART_FONT,callback:v=>fmt?fmt(v):v+'%'}})}}});
+}
+function drawSetupChart(closed){
+  const g={};['A','B','C','D'].forEach(x=>g[x]=[]);
+  closed.forEach(t=>{const k=t.setupGrade||'?';(g[k]=g[k]||[]).push(t);});
+  Object.keys(g).forEach(k=>{if(!g[k].length)delete g[k];});
+  const {labels,wr,counts}=winRateBars(g);
+  barChart('aSetup',labels.map(l=>'Grade '+l),wr,counts);
+}
+function drawStratChart(closed){
+  const g={};
+  closed.forEach(t=>{const k=strategyName(t.strategyId);(g[k]=g[k]||[]).push(t);});
+  const {labels,wr,counts}=winRateBars(g);
+  barChart('aStrat',labels,wr,counts);
+}
+function drawDowChart(closed){
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const g={};days.forEach(d=>g[d]=[]);
+  closed.forEach(t=>g[days[new Date(t.datetime).getDay()]].push(t));
+  const labels=days.filter(d=>g[d].length);
+  const data=labels.map(d=>g[d].reduce((a,t)=>a+netPL(t),0));
+  const counts=labels.map(d=>g[d].length);
+  barChart('aDow',labels,data,counts,v=>moneyShort(v));
+}
+function drawHourChart(closed){
+  const g={};
+  closed.forEach(t=>{const h=new Date(t.datetime).getHours();(g[h]=g[h]||[]).push(t);});
+  const labels=Object.keys(g).sort((a,b)=>a-b);
+  const data=labels.map(h=>g[h].reduce((a,t)=>a+netPL(t),0));
+  const counts=labels.map(h=>g[h].length);
+  barChart('aHour',labels.map(h=>h+':00'),data,counts,v=>moneyShort(v));
+}
+function drawRChart(closed){
+  const rs=closed.map(rMultiple).filter(r=>r!=null).sort((a,b)=>a-b);
+  if(!rs.length){const ctx=$('#aR');if(ctx)ctx.parentElement.innerHTML='<div class="empty"><span>Add risk amounts to trades to see R-multiples.</span></div>';return;}
+  const ctx=$('#aR');
+  charts.aR=new Chart(ctx,{type:'bar',data:{labels:rs.map((_,i)=>i+1),datasets:[{data:rs,
+    backgroundColor:rs.map(r=>r>=0?'#4ade80aa':'#f87171aa'),borderColor:rs.map(r=>r>=0?'#4ade80':'#f87171'),borderWidth:1,borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y.toFixed(2)+'R'}}},
+    scales:{x:baseScale({ticks:{color:'#5b6577',font:CHART_FONT,maxTicksLimit:12}}),y:baseScale({ticks:{color:'#8a94a6',font:CHART_FONT,callback:v=>v+'R'}})}}});
+}
+
+/* ============================================================
+   AI INSIGHTS  (Claude in-app via Anthropic API)
+   ============================================================ */
+function renderAI(c,tb){
+  c.innerHTML=`
+  <div style="max-width:760px">
+    <div class="card mb">
+      <div class="card-head"><h3>AI Performance Analyst</h3><span class="card-sub">powered by Claude</span></div>
+      <p class="note-meta" style="margin-bottom:16px;line-height:1.6">Claude reviews your trades, psychology log and lessons, then gives focused feedback. Your data is sent to the model only when you click a button below — nothing runs automatically. No API key needed.</p>
+      <div class="row wrap" style="gap:8px">
+        <button class="btn btn-sm" onclick="runAI('daily')">Daily Review</button>
+        <button class="btn btn-sm" onclick="runAI('weekly')">Weekly Review</button>
+        <button class="btn btn-sm" onclick="runAI('monthly')">Monthly Review</button>
+        <button class="btn btn-sm" onclick="runAI('behaviour')">Behaviour Analysis</button>
+        <button class="btn btn-sm" onclick="runAI('risk')">Risk Warnings</button>
+        <button class="btn btn-sm" onclick="runAI('improve')">Improvement Plan</button>
+      </div>
+    </div>
+    <div id="aiResult"></div>
+  </div>`;
+}
+
+function buildAIContext(){
+  const m=computeMetrics();
+  const recent=closedTradesSorted().slice(-25).map(t=>{
+    const psych=t.psychId?state.psych.find(x=>x.id===t.psychId):null;
+    const linkedLessons=(t.lessonIds||[]).map(id=>state.lessons.find(l=>l.id===id)).filter(Boolean);
+    return {
+      date:fmtDate(t.datetime),sym:t.symbol,dir:t.direction,strat:strategyName(t.strategyId),
+      grade:t.setupGrade,entry:t.entry,stop:t.stop,exit:t.exit,risk:t.riskAmount,
+      net:Number(netPL(t).toFixed(2)),R:rMultiple(t)!=null?Number(rMultiple(t).toFixed(2)):null,notes:t.notes,
+      mindset: psych?{mood:psych.mood,confidence:psych.confidence,stress:psych.stress,energy:psych.energy,followedRules:psych.compliance}:null,
+      lessons: linkedLessons.length?linkedLessons.map(l=>l.mistake):null
+    };
+  });
+  const psych=state.psych.slice(-15).map(p=>({date:fmtDate(p.datetime),mood:p.mood,confidence:p.confidence,stress:p.stress,energy:p.energy,followedRules:p.compliance,note:p.note}));
+  const lessons=state.lessons.slice(-10).map(l=>({cat:l.category,mistake:l.mistake,rootCause:l.rootCause,prevention:l.prevention}));
+  return {
+    summary:{currency:cur(),netCapital:m.capitalBase,deposits:m.deposits,withdrawals:m.withdrawals,currentEquity:Number(m.finalEquity.toFixed(2)),trades:m.n,winRate:Math.round(m.winRate),
+      profitFactor:m.profitFactor===Infinity?'inf':Number(m.profitFactor.toFixed(2)),expectancy:Number(m.expectancy.toFixed(2)),
+      expectancyR:m.expectancyR!=null?Number(m.expectancyR.toFixed(2)):null,netTotal:Number(m.netTotal.toFixed(2)),
+      maxDrawdown:Number(m.maxDD.toFixed(2)),maxWinStreak:m.maxWinStreak,maxLossStreak:m.maxLossStreak,
+      disciplineScore:m.disc,riskScore:m.riskScore},
+    recentTrades:recent, psychology:psych, lessons:lessons
+  };
+}
+const AI_PROMPTS={
+  daily:'Act as a trading performance coach. Review the most recent trading day in the data. Give a concise daily review: what went well, what to watch, and one specific action for tomorrow.',
+  weekly:'Act as a trading performance coach. Give a weekly review based on the data: key patterns, win rate and expectancy trends, and 2-3 priorities for next week.',
+  monthly:'Act as a trading performance coach. Give a monthly performance review: overall trajectory, strengths, recurring weaknesses, and whether the trader is showing readiness to scale up risk or should keep position sizes small.',
+  behaviour:'Act as a trading psychologist. Cross-reference the psychology log with trade outcomes. Identify behavioural patterns (e.g. does stress or low energy correlate with losses, signs of revenge trading or overtrading). Be specific and reference the data.',
+  risk:'Act as a risk manager. Scan the data for risk red flags: oversized losses beyond planned risk, widening stops, loss streaks, missing risk amounts, low risk score. List concrete warnings ranked by severity.',
+  improve:'Act as a trading mentor. Based on all the data, give a focused improvement plan: the single highest-leverage thing to fix first, then 2-3 supporting habits. Keep it practical and process-oriented.'
+};
+const AI_TITLES={daily:'Daily Review',weekly:'Weekly Review',monthly:'Monthly Review',behaviour:'Behaviour Analysis',risk:'Risk Warnings',improve:'Improvement Plan'};
+
+async function runAI(kind){
+  const m=computeMetrics();
+  if(m.n===0 && state.psych.length===0){ toast('Log some trades first','warn'); return; }
+  const out=$('#aiResult');
+  out.innerHTML=`<div class="card"><div class="card-head"><h3>${AI_TITLES[kind]}</h3><span class="spinner" style="margin-left:auto"></span></div><div class="note-meta">Claude is analysing your data…</div></div>`;
+  const ctx=buildAIContext();
+  const sys='You are an experienced trading coach embedded in a trader\'s journal app. You give honest, specific, process-focused feedback grounded in the data provided. You are not a financial advisor and never give buy/sell recommendations or predictions. Be concise and direct. Use short paragraphs and where helpful a few bullet points. The trader is a disciplined beginner from an IT operations background building good habits. Keep total response under 350 words. Structure with brief bold section labels where natural.';
+  const userMsg=`${AI_PROMPTS[kind]}\n\nHere is the trader's data as JSON:\n${JSON.stringify(ctx,null,1)}`;
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1100,system:sys,messages:[{role:'user',content:userMsg}]})
+    });
+    if(!resp.ok){throw new Error('HTTP '+resp.status);}
+    const data=await resp.json();
+    const text=(data.content||[]).map(b=>b.type==='text'?b.text:'').join('\n').trim();
+    window._aiLastText=text;
+    out.innerHTML=`<div class="card">
+      <div class="card-head"><h3>${AI_TITLES[kind]}</h3><span class="card-sub">${fmtDate(Date.now())}</span>
+        <div class="actions"><button class="btn btn-ghost btn-sm" onclick="copyText(this,window._aiLastText)">Copy</button></div>
+      </div>
+      <div class="ai-out">${formatAI(text)}</div>
+      <div class="note-meta" style="margin-top:12px">Generated by Claude · not financial advice</div>
+    </div>`;
+  }catch(e){
+    out.innerHTML=`<div class="card"><div class="ai-out">Couldn't reach the AI service right now (${esc(e.message)}). This feature needs a live connection to Anthropic's API. If you're running this file opened directly from disk, some browsers block the request — try again, or check your connection.</div></div>`;
+  }
+}
+function formatAI(t){
+  return esc(t)
+    .replace(/\*\*(.+?)\*\*/g,'<h4>$1</h4>')
+    .replace(/^[-•]\s+(.+)$/gm,'• $1');
+}
+function copyText(btn,txt){ navigator.clipboard.writeText(txt).then(()=>{btn.textContent='Copied';setTimeout(()=>btn.textContent='Copy',1500);}); }
+
+/* ============================================================
+   QUARTERLY REVIEW
+   ============================================================ */
+function renderQuarterly(c,tb){
+  tb.innerHTML=`<button class="btn btn-primary btn-sm" onclick="openQuarterlyForm()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Review</button>`;
+  const items=state.quarterly.slice().sort((a,b)=>(b.created||0)-(a.created||0));
+  if(!items.length){
+    c.innerHTML=`<div class="card"><div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <p>No quarterly reviews</p><span>Every 90 days, step back: best trades, worst trades, the recurring mistake, and your plan. Your continuous-improvement loop.</span>
+      <div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="openQuarterlyForm()">Start a review</button></div>
+    </div></div>`;
+    return;
+  }
+  c.innerHTML=`<div style="max-width:780px">${items.map(q=>`
+    <div class="card mb">
+      <div class="card-head"><h3>${esc(q.period)}</h3><span class="card-sub">${fmtDate(q.created)}</span>
+        <div class="actions"><button class="btn btn-ghost btn-sm" onclick="openQuarterlyForm('${q.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></div>
+      </div>
+      <div style="display:grid;gap:12px">
+        ${qBlock('Best trades',q.best,'pos')}
+        ${qBlock('Worst trades',q.worst,'neg')}
+        ${qBlock('Most common mistake',q.mistake)}
+        ${qBlock('Improvement plan',q.plan,'accent')}
+      </div>
+    </div>`).join('')}</div>`;
+}
+function qBlock(label,val,cls){
+  if(!val)return '';
+  const color=cls==='pos'?'var(--accent)':cls==='neg'?'var(--loss)':cls==='accent'?'var(--accent)':'var(--txt-dim)';
+  return `<div><div class="note-meta" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;color:${color}">${label}</div><div style="font-size:13px;color:var(--txt);white-space:pre-wrap">${esc(val)}</div></div>`;
+}
+function openQuarterlyForm(id){
+  const q=id?state.quarterly.find(x=>x.id===id):null;
+  const m=computeMetrics();
+  const defPeriod='Q'+(Math.floor(new Date().getMonth()/3)+1)+' '+new Date().getFullYear();
+  openModal(`<div class="modal-head"><h3>${q?'Edit':'New'} Quarterly Review</h3><button class="close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Period</label><input id="q_period" value="${q?esc(q.period):defPeriod}"></div>
+      ${!q?`<div class="ai-out" style="margin-bottom:14px;font-size:12px"><b>Snapshot:</b> ${m.n} trades · ${pct(m.winRate,0)} win rate · PF ${m.profitFactor===Infinity?'∞':m.profitFactor.toFixed(2)} · net ${money(m.netTotal)} · max DD ${money(-m.maxDD)}</div>`:''}
+      <div class="field"><label>Best trades — what worked</label><textarea id="q_best">${q?esc(q.best):''}</textarea></div>
+      <div class="field"><label>Worst trades — what went wrong</label><textarea id="q_worst">${q?esc(q.worst):''}</textarea></div>
+      <div class="field"><label>Most common mistake</label><textarea id="q_mistake">${q?esc(q.mistake):''}</textarea></div>
+      <div class="field"><label>Improvement plan for next quarter</label><textarea id="q_plan">${q?esc(q.plan):''}</textarea></div>
+    </div>
+    <div class="modal-foot">
+      ${q?`<button class="btn btn-danger" onclick="deleteQuarterly('${q.id}')" style="margin-right:auto">Delete</button>`:''}
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveQuarterly('${id||''}')">${q?'Save':'Create'}</button>
+    </div>`,true);
+}
+function saveQuarterly(id){
+  const data={period:$('#q_period').value.trim(),best:$('#q_best').value.trim(),worst:$('#q_worst').value.trim(),
+    mistake:$('#q_mistake').value.trim(),plan:$('#q_plan').value.trim()};
+  if(id){Object.assign(state.quarterly.find(x=>x.id===id),data);toast('Review updated');}
+  else{data.id=uid();data.created=Date.now();state.quarterly.push(data);toast('Review saved');}
+  save();closeModal();buildNav();renderView(currentView);
+}
+function deleteQuarterly(id){
+  confirmDialog('Delete this quarterly review?',()=>{state.quarterly=state.quarterly.filter(q=>q.id!==id);save();closeModal();buildNav();toast('Deleted','warn');renderView(currentView);},true);
+}
+
+/* ============================================================
+   CAPITAL LEDGER
+   ============================================================ */
+function renderCapital(c,tb){
+  tb.innerHTML=`<button class="btn btn-sm" onclick="openCapitalForm(null,'deposit')">+ Deposit</button>
+    <button class="btn btn-sm" onclick="openCapitalForm(null,'withdrawal')">− Withdrawal</button>`;
+  const m=computeMetrics();
+  const txns=(state.capital||[]).slice().sort((a,b)=>(b.datetime||0)-(a.datetime||0));
+  const summary=`<div class="stat-grid">
+    ${capStat('Total Deposited',money(m.deposits),'')}
+    ${capStat('Total Withdrawn',m.withdrawals>0?money(-m.withdrawals):money(0),'')}
+    ${capStat('Net Capital',money(m.capitalBase),'')}
+    ${capStat('Trading P/L',(m.netTotal>=0?'+':'')+money(m.netTotal),m.netTotal>=0?'pos':'neg')}
+    ${capStat('Current Equity',money(m.finalEquity),'pos')}
+  </div>`;
+  if(!txns.length){
+    c.innerHTML=summary+`<div class="card"><div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      <p>No capital transactions</p><span>Record your initial capital and any top-ups or withdrawals. Your equity and returns build on this.</span>
+      <div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="openCapitalForm(null,'deposit')">Add initial capital</button></div>
+    </div></div>`;
+    return;
+  }
+  c.innerHTML=summary+`
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="table-wrap" style="border:none"><table>
+      <thead><tr><th>Date</th><th>Type</th><th class="num">Amount</th><th>Note</th><th class="num">Running Capital</th><th></th></tr></thead>
+      <tbody>${(()=>{
+        // running net capital oldest->newest, then display newest first
+        const asc=txns.slice().sort((a,b)=>(a.datetime||0)-(b.datetime||0));
+        let run=0; const runMap={};
+        asc.forEach(t=>{ run+=(t.type==='withdrawal'?-1:1)*(Number(t.amount)||0); runMap[t.id]=run; });
+        return txns.map(t=>`<tr ondblclick="openCapitalForm('${t.id}')">
+          <td>${fmtDate(t.datetime)}</td>
+          <td><span class="tag tag-${t.type==='withdrawal'?'short':'long'}">${t.type==='withdrawal'?'Withdrawal':'Deposit'}</span></td>
+          <td class="num ${t.type==='withdrawal'?'neg':'pos'}" style="font-weight:600">${t.type==='withdrawal'?'−':'+'}${money(Number(t.amount)).replace(cur()+' ','')}</td>
+          <td style="white-space:normal;color:var(--txt-dim)">${esc(t.note||'')}</td>
+          <td class="num">${money(runMap[t.id])}</td>
+          <td class="num"><button class="btn btn-ghost btn-sm" onclick="openCapitalForm('${t.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td>
+        </tr>`).join('');
+      })()}</tbody>
+    </table></div>
+  </div>
+  <div class="note-meta" style="margin-top:10px;text-align:center">Double-click a row to edit · equity = net capital + trading P/L</div>`;
+}
+function capStat(k,v,cls){return `<div class="stat"><div class="k">${k}</div><div class="v ${cls}">${v}</div></div>`;}
+function openCapitalForm(id,defaultType){
+  const t=id?(state.capital||[]).find(x=>x.id===id):null;
+  const type=t?t.type:(defaultType||'deposit');
+  openModal(`<div class="modal-head"><h3>${t?'Edit':'New'} Capital Transaction</h3><button class="close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Type</label>
+        <select id="c_type"><option value="deposit" ${type==='deposit'?'selected':''}>Deposit / Top-up</option><option value="withdrawal" ${type==='withdrawal'?'selected':''}>Withdrawal</option></select>
+      </div>
+      <div class="field-row grid-2">
+        <div class="field"><label>Date</label><input type="datetime-local" id="c_datetime" value="${t?new Date(t.datetime).toISOString().slice(0,16):todayISO()}"></div>
+        <div class="field"><label>Amount (${cur()})</label><input type="number" step="any" id="c_amount" value="${t&&t.amount!=null?t.amount:''}"></div>
+      </div>
+      <div class="field"><label>Note</label><input id="c_note" placeholder="e.g. Initial capital, monthly top-up" value="${t?esc(t.note):''}"></div>
+    </div>
+    <div class="modal-foot">
+      ${t?`<button class="btn btn-danger" onclick="deleteCapital('${t.id}')" style="margin-right:auto">Delete</button>`:''}
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCapital('${id||''}')">${t?'Save':'Add'}</button>
+    </div>`);
+}
+function saveCapital(id){
+  const amount=Number($('#c_amount').value);
+  if(!amount||amount<=0){toast('Enter a positive amount','err');return;}
+  const data={type:$('#c_type').value,datetime:new Date($('#c_datetime').value).getTime(),amount,note:$('#c_note').value.trim()};
+  if(!Array.isArray(state.capital)) state.capital=[];
+  if(id){Object.assign(state.capital.find(x=>x.id===id),data);toast('Transaction updated');}
+  else{data.id=uid();state.capital.push(data);toast(data.type==='deposit'?'Deposit added':'Withdrawal added');}
+  // keep settings.startingCapital in sync with earliest deposit for legacy display
+  save();buildNav();closeModal();renderView(currentView);
+}
+function deleteCapital(id){
+  confirmDialog('Delete this capital transaction? Your equity and returns will recalculate.',()=>{
+    state.capital=state.capital.filter(c=>c.id!==id);save();buildNav();closeModal();toast('Deleted','warn');renderView(currentView);
+  },true);
+}
+
+/* ============================================================
+   SETTINGS & BACKUP
+   ============================================================ */
+function renderSettings(c,tb){
+  const s=state.settings;
+  c.innerHTML=`<div style="max-width:680px">
+    <div class="card mb">
+      <div class="card-head"><h3>Account</h3></div>
+      <div class="field-row grid-2">
+        <div class="field"><label>Trader name</label><input id="set_account" value="${esc(s.account)}"></div>
+        <div class="field"><label>Currency</label><input id="set_currency" value="${esc(s.currency)}" maxlength="4"></div>
+      </div>
+      <div class="field-row grid-2">
+        <div class="field"><label>Risk per trade (%)</label><input type="number" step="any" id="set_risk" value="${s.riskPerTradePct}"></div>
+        <div class="field"><label>Capital</label><div style="padding:9px 0"><button class="btn btn-sm" onclick="go('capital')">Manage capital ledger →</button></div></div>
+      </div>
+      <p class="note-meta" style="margin:-4px 0 14px">Capital is now tracked as dated deposits and withdrawals on the Capital page, so top-ups are reflected in your equity and returns.</p>
+      <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
+    </div>
+
+    <div class="card mb">
+      <div class="card-head"><h3>Backup & Restore</h3><span class="card-sub">your data lives in this browser</span></div>
+      <p class="note-meta" style="margin-bottom:14px;line-height:1.6">Everything is stored locally in your browser. It survives refreshes and restarts — but clearing browser data will erase it. <b style="color:var(--warn)">Export regularly</b> and keep the file safe. Re-import any backup to restore or move to another device.</p>
+      <div class="row wrap" style="gap:8px">
+        <button class="btn btn-primary" onclick="exportData()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export backup (JSON)</button>
+        <button class="btn" onclick="document.getElementById('importFile').click()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import / restore backup</button>
+        <input type="file" id="importFile" accept="application/json,.json" style="display:none" onchange="importData(this)">
+        <button class="btn" onclick="exportCSV()">Export trades (CSV)</button>
+        <button class="btn" onclick="exportXLSX()">Export workbook (Excel)</button>
+        <button class="btn" onclick="printReport()">Performance report (PDF)</button>
+      </div>
+      <div class="note-meta" style="margin-top:12px">Last saved: data auto-saves on every change.</div>
+    </div>
+
+    <div class="card mb">
+      <div class="card-head"><h3>Auto-backup reminder</h3></div>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" id="set_autoremind" ${s.autoRemind?'checked':''} style="width:auto" onchange="state.settings.autoRemind=this.checked;save()">
+        <span style="margin:0">Remind me to export when I close the app after changes</span>
+      </label>
+    </div>
+
+    <div class="card" style="border-color:#3a2630">
+      <div class="card-head"><h3 style="color:var(--loss)">Danger Zone</h3></div>
+      <p class="note-meta" style="margin-bottom:14px">Permanent. Export a backup first.</p>
+      <div class="row wrap" style="gap:8px">
+        <button class="btn btn-danger" onclick="clearTrades()">Delete all trades</button>
+        <button class="btn btn-danger" onclick="wipeAll()">Reset everything</button>
+      </div>
+    </div>
+  </div>`;
+}
+function saveSettings(){
+  state.settings.account=$('#set_account').value.trim()||'Trader';
+  state.settings.currency=$('#set_currency').value.trim()||'SGD';
+  state.settings.riskPerTradePct=Number($('#set_risk').value)||1;
+  save();toast('Settings saved');renderView('settings');
+}
+function exportData(){
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='tradeops-backup-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click(); URL.revokeObjectURL(url);
+  state._dirtySinceExport=false;
+  state.lastExport={count:state.trades.length, at:Date.now()};
+  _origSave();
+  bannerDismissed=false;
+  updateBackupBanner();
+  toast('Backup downloaded');
+}
+function importData(input){
+  const file=input.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      if(!data || typeof data!=='object' || !('trades' in data)) throw new Error('Not a valid backup file');
+      confirmDialog(`Restore from "${file.name}"? This replaces all current data (${state.trades.length} trades) with the backup (${(data.trades||[]).length} trades).`,()=>{
+        state=migrate(data); pruneDanglingLinks(); save(); buildNav(); go('dashboard'); toast('Backup restored');
+      },false);
+    }catch(err){ toast('Import failed: '+err.message,'err'); }
+    input.value='';
+  };
+  reader.readAsText(file);
+}
+// Strip references to psych/lesson records that don't exist (e.g. hand-edited backups)
+function pruneDanglingLinks(){
+  const psychIds=new Set(state.psych.map(p=>p.id));
+  const lessonIds=new Set(state.lessons.map(l=>l.id));
+  state.trades.forEach(t=>{
+    if(t.psychId && !psychIds.has(t.psychId)) t.psychId=null;
+    if(Array.isArray(t.lessonIds)) t.lessonIds=t.lessonIds.filter(id=>lessonIds.has(id));
+  });
+}
+function exportCSV(){
+  if(!state.trades.length){toast('No trades to export','warn');return;}
+  const cols=['datetime','symbol','assetClass','direction','strategy','setupGrade','entry','stop','target','exit','size','riskAmount','commission','grossPL','netPL','rMultiple','notes',
+    'linkedMood','linkedConfidence','linkedStress','linkedEnergy','linkedFollowedRules','linkedLessons'];
+  const rows=state.trades.slice().sort((a,b)=>(a.datetime||0)-(b.datetime||0)).map(t=>{
+    const r=rMultiple(t);
+    const psych=t.psychId?state.psych.find(x=>x.id===t.psychId):null;
+    const lessons=(t.lessonIds||[]).map(id=>{const l=state.lessons.find(x=>x.id===id);return l?(l.mistake||'lesson'):'';}).filter(Boolean);
+    return [new Date(t.datetime).toISOString(),t.symbol,t.assetClass,t.direction,strategyName(t.strategyId),t.setupGrade,
+      t.entry,t.stop,t.target,t.exit,t.size,t.riskAmount,t.commission,t.grossPL,netPL(t),r!=null?r.toFixed(3):'',(t.notes||'').replace(/\n/g,' '),
+      psych?psych.mood:'', psych?psych.confidence:'', psych?psych.stress:'', psych?psych.energy:'', psych?psych.compliance:'',
+      lessons.join(' | ').replace(/\n/g,' ')];
+  });
+  const csv=[cols.join(',')].concat(rows.map(r=>r.map(v=>{
+    if(v==null)return '';
+    const s=String(v);
+    return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+  }).join(','))).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='tradeops-trades-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  URL.revokeObjectURL(url);toast('CSV exported');
+}
+
+/* ---------- Multi-sheet Excel workbook ---------- */
+function exportXLSX(){
+  if(typeof XLSX==='undefined'){ toast('Excel library not loaded — check your connection','err'); return; }
+  const m=computeMetrics();
+  const wb=XLSX.utils.book_new();
+
+  // Summary sheet
+  const summary=[
+    ['Trading Operations — Workbook'],
+    ['Account', state.settings.account],
+    ['Currency', cur()],
+    ['Generated', new Date().toLocaleString()],
+    [],
+    ['CAPITAL'],
+    ['Total deposited', m.deposits],
+    ['Total withdrawn', m.withdrawals],
+    ['Net capital', m.capitalBase],
+    ['Trading P/L', m.netTotal],
+    ['Current equity', m.finalEquity],
+    [],
+    ['PERFORMANCE'],
+    ['Closed trades', m.n],
+    ['Win rate %', Number(m.winRate.toFixed(1))],
+    ['Profit factor', m.profitFactor===Infinity?'inf':Number(m.profitFactor.toFixed(2))],
+    ['Expectancy', Number(m.expectancy.toFixed(2))],
+    ['Expectancy (R)', m.expectancyR!=null?Number(m.expectancyR.toFixed(2)):''],
+    ['Total return %', Number(m.totalReturnPct.toFixed(1))],
+    ['Max drawdown', Number(m.maxDD.toFixed(2))],
+    ['Max win streak', m.maxWinStreak],
+    ['Max loss streak', m.maxLossStreak],
+    ['Discipline score', m.disc!=null?m.disc:''],
+    ['Risk score', m.riskScore!=null?m.riskScore:'']
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
+
+  // Trades sheet (with linkage)
+  const tradeRows=state.trades.slice().sort((a,b)=>(a.datetime||0)-(b.datetime||0)).map(t=>{
+    const r=rMultiple(t);
+    const psych=t.psychId?state.psych.find(x=>x.id===t.psychId):null;
+    const lessons=(t.lessonIds||[]).map(id=>{const l=state.lessons.find(x=>x.id===id);return l?l.mistake:'';}).filter(Boolean);
+    return {
+      Date:new Date(t.datetime).toLocaleString(), Symbol:t.symbol, 'Asset Class':t.assetClass, Direction:t.direction,
+      Strategy:strategyName(t.strategyId), 'Setup Grade':t.setupGrade, Entry:t.entry, Stop:t.stop, Target:t.target,
+      Exit:t.exit, 'Qty':t.size, 'Risk Amount':t.riskAmount, Commission:t.commission, 'Gross P/L':t.grossPL,
+      'Net P/L':netPL(t), 'R Multiple':r!=null?Number(r.toFixed(3)):'', Notes:t.notes,
+      'Linked Mood':psych?psych.mood:'', 'Linked Confidence':psych?psych.confidence:'', 'Linked Stress':psych?psych.stress:'',
+      'Linked Energy':psych?psych.energy:'', 'Followed Rules':psych?psych.compliance:'', 'Linked Lessons':lessons.join(' | ')
+    };
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(tradeRows.length?tradeRows:[{Date:'(no trades)'}]), 'Trades');
+
+  // Capital sheet
+  const capRows=(state.capital||[]).slice().sort((a,b)=>(a.datetime||0)-(b.datetime||0)).map(c=>({
+    Date:new Date(c.datetime).toLocaleString(), Type:c.type, Amount:Number(c.amount)||0, Note:c.note||''
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(capRows.length?capRows:[{Date:'(none)'}]), 'Capital');
+
+  // Psychology sheet
+  const psychRows=state.psych.slice().sort((a,b)=>(a.datetime||0)-(b.datetime||0)).map(p=>({
+    Date:new Date(p.datetime).toLocaleString(), Mood:p.mood, Confidence:p.confidence, Stress:p.stress, Energy:p.energy,
+    'Followed Rules':p.compliance, Reflection:p.note||''
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(psychRows.length?psychRows:[{Date:'(none)'}]), 'Psychology');
+
+  // Lessons sheet
+  const lessonRows=state.lessons.slice().sort((a,b)=>(a.created||0)-(b.created||0)).map(l=>({
+    Date:fmtDate(l.created), Category:l.category, Mistake:l.mistake, 'Root Cause':l.rootCause, Resolution:l.resolution, Prevention:l.prevention,
+    'Linked Trades':tradesLinkingLesson(l.id).map(t=>t.symbol+' '+fmtDate(t.datetime)).join(' | ')
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lessonRows.length?lessonRows:[{Date:'(none)'}]), 'Lessons');
+
+  XLSX.writeFile(wb, 'tradeops-workbook-'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('Excel workbook exported');
+}
+function clearTrades(){
+  confirmDialog('Delete ALL trades permanently? Strategies, lessons and notes are kept. Export a backup first if unsure.',()=>{
+    state.trades=[];save();buildNav();toast('All trades deleted','warn');go('dashboard');
+  },true);
+}
+function wipeAll(){
+  confirmDialog('Reset the ENTIRE app to empty? This erases trades, strategies, psychology log, lessons, library and reviews. This cannot be undone.',()=>{
+    state=blankState();save();buildNav();toast('Everything reset','warn');go('dashboard');
+  },true);
+}
+
+/* ---------- PDF performance report via print ---------- */
+function printReport(){
+  const m=computeMetrics();
+  const w=window.open('','_blank');
+  if(!w){toast('Allow pop-ups to generate the report','warn');return;}
+  const rows=closedTradesSorted().slice(-50).reverse().map(t=>{
+    const p=netPL(t),r=rMultiple(t);
+    return `<tr><td>${fmtDate(t.datetime)}</td><td>${esc(t.symbol)}</td><td>${esc(t.direction)}</td><td>${esc(strategyName(t.strategyId))}</td>
+      <td style="text-align:right">${p>=0?'+':''}${p.toFixed(2)}</td><td style="text-align:right">${r!=null?r.toFixed(2)+'R':'—'}</td></tr>`;
+  }).join('');
+  w.document.write(`<!DOCTYPE html><html><head><title>Performance Report</title><style>
+    body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#111;padding:36px;max-width:780px;margin:auto}
+    h1{font-size:22px;margin:0 0 4px}.sub{color:#666;font-size:13px;margin-bottom:24px}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px}
+    .stat{border:1px solid #ddd;border-radius:8px;padding:12px 14px}
+    .stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#888}
+    .stat .v{font-size:20px;font-weight:600;font-family:ui-monospace,monospace;margin-top:4px}
+    .pos{color:#16a34a}.neg{color:#dc2626}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th{text-align:left;border-bottom:2px solid #333;padding:8px;font-size:10px;text-transform:uppercase;color:#666}
+    td{padding:7px 8px;border-bottom:1px solid #eee}
+    h2{font-size:14px;margin:28px 0 10px}
+    @media print{body{padding:0}}
+  </style></head><body>
+    <h1>Trading Performance Report</h1>
+    <div class="sub">${esc(state.settings.account)} · ${cur()} · generated ${fmtDate(Date.now())}</div>
+    <div class="grid">
+      <div class="stat"><div class="k">Net P/L</div><div class="v ${m.netTotal>=0?'pos':'neg'}">${cur()} ${m.netTotal.toFixed(2)}</div></div>
+      <div class="stat"><div class="k">Total Return</div><div class="v ${m.totalReturnPct>=0?'pos':'neg'}">${m.totalReturnPct.toFixed(1)}%</div></div>
+      <div class="stat"><div class="k">Win Rate</div><div class="v">${m.winRate.toFixed(0)}%</div></div>
+      <div class="stat"><div class="k">Profit Factor</div><div class="v">${m.profitFactor===Infinity?'∞':m.profitFactor.toFixed(2)}</div></div>
+      <div class="stat"><div class="k">Expectancy</div><div class="v ${m.expectancy>=0?'pos':'neg'}">${cur()} ${m.expectancy.toFixed(2)}</div></div>
+      <div class="stat"><div class="k">Max Drawdown</div><div class="v neg">${cur()} ${m.maxDD.toFixed(2)}</div></div>
+      <div class="stat"><div class="k">Trades</div><div class="v">${m.n}</div></div>
+      <div class="stat"><div class="k">Win / Loss Streak</div><div class="v">${m.maxWinStreak} / ${m.maxLossStreak}</div></div>
+      <div class="stat"><div class="k">Discipline</div><div class="v">${m.disc!=null?m.disc:'—'}</div></div>
+    </div>
+    <h2>Recent Trades</h2>
+    <table><thead><tr><th>Date</th><th>Symbol</th><th>Dir</th><th>Strategy</th><th style="text-align:right">Net P/L</th><th style="text-align:right">R</th></tr></thead><tbody>${rows||'<tr><td colspan=6>No trades</td></tr>'}</tbody></table>
+    <p style="margin-top:24px;color:#999;font-size:11px">Generated by Trading Ops Platform. Not financial advice.</p>
+  </body></html>`);
+  w.document.close();
+  setTimeout(()=>w.print(),350);
+}
+
+/* ============================================================
+   BACKUP REMINDER BANNER
+   ============================================================ */
+let bannerDismissed=false;
+const BACKUP_THRESHOLD=5; // new trades since last export before nudging
+function unexportedCount(){
+  const last = state.lastExport ? state.lastExport.count : 0;
+  return Math.max(0, state.trades.length - last);
+}
+function updateBackupBanner(){
+  const el=document.getElementById('backupBanner');
+  if(!el) return;
+  const n=unexportedCount();
+  const never = !state.lastExport;
+  const show = !bannerDismissed && state.trades.length>0 && (n>=BACKUP_THRESHOLD || (never && state.trades.length>=BACKUP_THRESHOLD));
+  if(show){
+    const txt = never
+      ? `You've logged <b>${state.trades.length} trades</b> and never backed up. Your data lives only in this browser — export a copy to keep it safe.`
+      : `<b>${n} new trade${n>1?'s':''}</b> since your last backup. Export now so you don't lose them if this browser's data is cleared.`;
+    document.getElementById('backupBannerText').innerHTML=txt;
+    el.classList.add('show');
+  }else{
+    el.classList.remove('show');
+  }
+}
+function dismissBackupBanner(){
+  bannerDismissed=true;
+  updateBackupBanner();
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+window.addEventListener('beforeunload',e=>{
+  if(state.settings.autoRemind && state._dirtySinceExport && unexportedCount()>0){
+    e.preventDefault(); e.returnValue='';
+  }
+});
+const _origSave=save;
+save=function(){ state._dirtySinceExport=true; _origSave(); };
+
+buildNav();
+go('dashboard');
+updateBackupBanner();
+
+// Register service worker for installability (only when served over http/https, not file://)
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "Trading Operations Platform",
+  "short_name": "Trading Ops",
+  "description": "A disciplined trading journal, playbook, and process platform.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c0f14",
+  "theme_color": "#0c0f14",
+  "icons": [
+    { "src": "config/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "config/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "config/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
