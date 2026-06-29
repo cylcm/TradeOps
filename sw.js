@@ -1,5 +1,5 @@
 // Minimal service worker: enables installability and basic offline access.
-const CACHE = 'tradeops-v1';
+const CACHE = 'tradeops-v2';
 const ASSETS = ['./', './index.html', './manifest.json', './config/icon-192.png', './config/icon-512.png', './config/icon-180.png'];
 
 self.addEventListener('install', e => {
