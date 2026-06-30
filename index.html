@@ -382,7 +382,7 @@ tbody tr:hover{background:var(--panel-2)}
    ============================================================ */
 
 const STORE_KEY = 'tradeops_v1';
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 1;
 
 /* ---------- Default operational checklists (seed; editable thereafter) ---------- */
 function defaultOpsChecklists(){
@@ -437,7 +437,7 @@ function defaultOpsChecklists(){
 function blankState(){
   return {
     schema: SCHEMA_VERSION,
-    settings:{ account:'Trader', startingCapital:10000, currency:'SGD', riskPerTradePct:1 },
+    settings:{ account:'Trader', startingCapital:10000, currency:'SGD', riskPerTradePct:1, syncTarget:'local' },
     capital:[],            // capital transactions: {id, datetime, type:'deposit'|'withdrawal', amount, note}
     trades:[],
     strategies:[],
@@ -447,10 +447,6 @@ function blankState(){
     opsChecklist:{},     // tick-state for the operational/QA checklists, keyed by item id
     opsChecklists:null,  // the editable checklist structure (seeded from default on first load)
     quarterly:[],        // quarterly reviews
-    watchlists:[],       // [{id,name,note,created,symbols:[{id,symbol,aiScore,myConf,reason,added}]}]
-    holdings:[],         // ETF/dividend holdings: {id,symbol,name,shares,price,annualDividend,yieldPct,frequency,note,created}
-    dividends:[],        // actual payouts logged: {id,datetime,symbol,holdingId,amount,perShare,shares,note,tradeId}
-    skills:[],           // learning progress: {id,name,level(0-100),note}
     checklistTemplate:[
       'Market trend identified',
       'Risk calculated & within limit',
@@ -489,30 +485,6 @@ function migrate(s){
   if(!s.opsChecklists || !Array.isArray(s.opsChecklists) || !s.opsChecklists.length){
     s.opsChecklists = defaultOpsChecklists();
   }
-  // v2: seed default learning-progress skills if empty
-  if(!Array.isArray(s.skills)) s.skills=[];
-  if(!s.skills.length){
-    s.skills=[
-      {id:uid(),name:'Technical Analysis',level:0,note:''},
-      {id:uid(),name:'Risk Management',level:0,note:''},
-      {id:uid(),name:'Trading Psychology',level:0,note:''},
-      {id:uid(),name:'Options',level:0,note:''},
-      {id:uid(),name:'Futures',level:0,note:''},
-      {id:uid(),name:'ETF Investing',level:0,note:''}
-    ];
-  }
-  // v2: ensure new collection keys are arrays
-  ['watchlists','holdings','dividends'].forEach(k=>{ if(!Array.isArray(s[k])) s[k]=[]; });
-  // v2: backfill incident fields on existing lessons (RCA → incident-aware)
-  (s.lessons||[]).forEach(l=>{
-    if(l.severity===undefined) l.severity='';        // '', Low, Medium, High, Critical
-    if(l.status===undefined) l.status='Open';        // Open, Investigating, Resolved, Closed
-    if(l.owner===undefined) l.owner='';
-    if(l.tradeId===undefined) l.tradeId=null;         // optional direct trade link
-  });
-  // v2: backfill trade readiness-score field
-  (s.trades||[]).forEach(t=>{ if(t.trs===undefined) t.trs=null; });
-  s.schema=SCHEMA_VERSION;
   return s;
 }
 /* ---------- Capital helpers ---------- */
@@ -715,29 +687,23 @@ const ICONS = {
   library:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
   quarterly:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
   casefile:'<path d="M4 4h6l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>',
-  settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
-  watchlists:'<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
-  income:'<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
-  skills:'<path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>'
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'
 };
 const NAV = [
   {group:'Operate', items:[
     {id:'dashboard', label:'Dashboard'},
     {id:'capital', label:'Capital'},
-    {id:'watchlists', label:'Watchlists'},
     {id:'readiness', label:'Pre-Trade Readiness'},
     {id:'journal', label:'Trade Journal'},
     {id:'psych', label:'Psychology Log'},
   ]},
   {group:'Build', items:[
     {id:'playbook', label:'Playbook'},
-    {id:'lessons', label:'Lessons & Incidents'},
+    {id:'lessons', label:'Lessons (RCA)'},
     {id:'library', label:'Study Library'},
-    {id:'skills', label:'Learning Progress'},
   ]},
   {group:'Review', items:[
     {id:'casefile', label:'Case Files'},
-    {id:'income', label:'Income & Dividends'},
     {id:'analytics', label:'Analytics'},
     {id:'ai', label:'AI Insights'},
     {id:'quarterly', label:'Quarterly Review'},
@@ -746,7 +712,7 @@ const NAV = [
     {id:'settings', label:'Settings & Backup'},
   ]}
 ];
-const TITLES = {dashboard:'Dashboard',capital:'Capital',watchlists:'Watchlists & Candidates',readiness:'Pre-Trade Readiness',journal:'Trade Journal',psych:'Psychology Log',playbook:'Trading Playbook',lessons:'Lessons & Incidents (RCA)',library:'Study Library',skills:'Learning Progress',casefile:'Case Files',income:'Income & Dividends',analytics:'Analytics',ai:'AI Insights',quarterly:'Quarterly Review',settings:'Settings & Backup'};
+const TITLES = {dashboard:'Dashboard',capital:'Capital',readiness:'Pre-Trade Readiness',journal:'Trade Journal',psych:'Psychology Log',playbook:'Trading Playbook',lessons:'Lessons Learned (RCA)',library:'Study Library',casefile:'Case Files',analytics:'Analytics',ai:'AI Insights',quarterly:'Quarterly Review',settings:'Settings & Backup'};
 
 let currentView='dashboard';
 let charts={};
@@ -775,8 +741,6 @@ function navBadge(id){
   else if(id==='lessons')n=state.lessons.length;
   else if(id==='library')n=state.library.length;
   else if(id==='quarterly')n=state.quarterly.length;
-  else if(id==='watchlists')n=(state.watchlists||[]).reduce((a,w)=>a+(w.symbols?w.symbols.length:0),0);
-  else if(id==='income')n=(state.holdings||[]).length;
   return n? `<span class="badge">${n}</span>`:'';
 }
 function highlightNav(){
@@ -810,15 +774,12 @@ function renderView(view){
   switch(view){
     case 'dashboard': renderDashboard(c,tb); break;
     case 'capital': renderCapital(c,tb); break;
-    case 'watchlists': renderWatchlists(c,tb); break;
     case 'readiness': renderReadiness(c,tb); break;
     case 'journal': renderJournal(c,tb); break;
     case 'psych': renderPsych(c,tb); break;
     case 'playbook': renderPlaybook(c,tb); break;
     case 'lessons': renderLessons(c,tb); break;
     case 'library': renderLibrary(c,tb); break;
-    case 'skills': renderSkills(c,tb); break;
-    case 'income': renderIncome(c,tb); break;
     case 'casefile': renderCaseFile(c,tb); break;
     case 'analytics': renderAnalytics(c,tb); break;
     case 'ai': renderAI(c,tb); break;
@@ -1030,7 +991,7 @@ function renderJournal(c,tb){
     <div class="table-wrap" style="border:none">
       <table>
         <thead><tr>
-          <th>Date</th><th>Symbol</th><th>Dir</th><th>Strategy</th><th>Grade</th><th>Status</th>
+          <th>Date</th><th>Symbol</th><th>Dir</th><th>Strategy</th><th>Grade</th>
           <th class="num">Entry</th><th class="num">Stop</th><th class="num">Exit</th>
           <th class="num">Risk</th><th class="num">Net P/L</th><th class="num">R</th><th></th>
         </tr></thead>
@@ -1045,7 +1006,6 @@ function renderJournal(c,tb){
             <td><span class="tag tag-${t.direction==='Short'?'short':'long'}">${esc(t.direction||'Long')}</span></td>
             <td>${esc(strategyName(t.strategyId))}</td>
             <td><span class="tag tag-grade grade-${esc(t.setupGrade||'')}">${esc(t.setupGrade||'—')}</span></td>
-            <td><span class="pill" style="font-size:9.5px;padding:2px 7px;border-color:${statusColor(t.status)};color:${statusColor(t.status)}">${esc(t.status||'Open')}</span>${t.trs!=null?`<div class="note-meta" style="font-size:9px">TRS ${t.trs}</div>`:''}</td>
             <td class="num">${t.entry?Number(t.entry).toFixed(2):'—'}</td>
             <td class="num dim">${t.stop?Number(t.stop).toFixed(2):'—'}</td>
             <td class="num">${t.exit?Number(t.exit).toFixed(2):'—'}</td>
@@ -1064,7 +1024,6 @@ function renderJournal(c,tb){
 
 function strategyName(id){ const s=state.strategies.find(s=>s.id===id); return s?s.name:'—'; }
 
-const TRADE_STATUSES=['Request','Checklist','Approved','Open','Monitoring','Closed','Cancelled'];
 function openTradeForm(id, repopulate){
   const t = id? state.trades.find(x=>x.id===id) : null;
   window._tradeEditId = id||'';
@@ -1093,14 +1052,6 @@ function openTradeForm(id, repopulate){
         <div class="field"><label>Strategy</label><select id="f_strategyId"><option value="">— none —</option>${stratOpts}</select></div>
         <div class="field"><label>Setup Grade</label>
           <select id="f_setupGrade">${['','A','B','C','D'].map(g=>`<option value="${g}" ${t&&t.setupGrade===g?'selected':''}>${g||'—'}</option>`).join('')}</select>
-        </div>
-      </div>
-      <div class="field-row grid-2">
-        <div class="field"><label>Lifecycle Status</label>
-          <select id="f_status">${TRADE_STATUSES.map(s=>`<option ${ (t&&t.status===s) || (!t&&s==='Open') ?'selected':''}>${s}</option>`).join('')}</select>
-        </div>
-        <div class="field"><label>Trade Readiness Score</label>
-          <input id="f_trs" readonly value="${t&&t.trs!=null?t.trs+' / 100':(window._pendingTRS!=null?window._pendingTRS+' / 100':'—')}" placeholder="set on Readiness screen" style="opacity:.85">
         </div>
       </div>
       <div class="field-row grid-4">
@@ -1176,7 +1127,6 @@ function saveTrade(id){
     symbol:$('#f_symbol').value.trim().toUpperCase(),
     assetClass:$('#f_assetClass').value, direction:dir,
     strategyId:$('#f_strategyId').value, setupGrade:$('#f_setupGrade').value,
-    status:$('#f_status')?$('#f_status').value:'Open',
     entry,stop,target:num('f_target'),exit,size,riskAmount,
     commission:num('f_commission'), grossPL, netPL:num('f_netPL'),
     notes:$('#f_notes').value.trim(), screenshot:$('#f_screenshot').value.trim(),
@@ -1187,11 +1137,9 @@ function saveTrade(id){
   if(id){
     const t=state.trades.find(x=>x.id===id);
     Object.assign(t,data);
-    if(t.trs==null && window._pendingTRS!=null) t.trs=window._pendingTRS;
     toast('Trade updated');
   }else{
     data.id=uid(); data.checklist=window._pendingChecklist||null; window._pendingChecklist=null;
-    data.trs=(window._pendingTRS!=null)?window._pendingTRS:null; window._pendingTRS=null;
     state.trades.push(data);
     toast('Trade logged');
   }
@@ -1200,8 +1148,6 @@ function saveTrade(id){
 function deleteTrade(id){
   confirmDialog('Delete this trade permanently? This cannot be undone.',()=>{
     state.trades=state.trades.filter(t=>t.id!==id);
-    (state.lessons||[]).forEach(l=>{ if(l.tradeId===id) l.tradeId=null; });
-    (state.dividends||[]).forEach(d=>{ if(d.tradeId===id) d.tradeId=null; });
     save(); closeModal(); buildNav(); toast('Trade deleted','warn'); renderView(currentView);
   },true);
 }
@@ -1292,57 +1238,13 @@ function renderReadiness(c,tb){
         </div>
       </div>
     </div>
-
-    <div class="card mb">
-      <div class="card-head"><h3>Trade Readiness Score</h3><span class="card-sub">weighted setup quality</span></div>
-      <p class="note-meta" style="margin-bottom:14px">Score each factor 0–10. The weighted total (0–100) is attached to the trade you log, so you can later compare TRS against actual outcomes — does a higher score really mean a better trade?</p>
-      <div id="trsRows">
-        ${TRS_FACTORS.map(f=>`
-          <div class="row spread" style="margin-bottom:12px;gap:14px">
-            <div style="min-width:140px"><div style="font-size:13px;font-weight:500">${f.label}</div><div class="note-meta">weight ${Math.round(f.w*100)}%</div></div>
-            <input type="range" min="0" max="10" step="1" value="${trsState[f.key]!=null?trsState[f.key]:0}" oninput="setTrs('${f.key}',this.value)" style="flex:1">
-            <span class="num" id="trsv_${f.key}" style="min-width:24px;text-align:right">${trsState[f.key]!=null?trsState[f.key]:0}</span>
-          </div>`).join('')}
-      </div>
-      <div class="divider"></div>
-      <div class="row spread">
-        <span class="note-meta">Higher is not "buy" — it only measures how well this setup matches your own criteria.</span>
-        <div class="row" style="gap:10px;align-items:baseline">
-          <span class="note-meta">SCORE</span>
-          <span class="num" id="trsTotal" style="font-size:26px;font-weight:700;color:${trsColor(computeTRS())}">${computeTRS()}</span>
-          <span class="note-meta">/ 100</span>
-        </div>
-      </div>
-    </div>
   </div>`;
 }
-const TRS_FACTORS=[
-  {key:'trend',label:'Trend',w:0.20},
-  {key:'sr',label:'Support / Resistance',w:0.15},
-  {key:'volume',label:'Volume',w:0.15},
-  {key:'rr',label:'Risk / Reward',w:0.20},
-  {key:'playbook',label:'Playbook Match',w:0.20},
-  {key:'psych',label:'Psychology',w:0.10}
-];
-let trsState={};
-function computeTRS(){
-  let total=0;
-  TRS_FACTORS.forEach(f=>{ const v=Number(trsState[f.key]||0); total+=(v/10)*f.w*100; });
-  return Math.round(total);
-}
-function trsColor(s){ return s>=80?'var(--accent)':s>=60?'var(--warn)':'var(--loss)'; }
-function setTrs(key,val){
-  trsState[key]=Number(val);
-  const vEl=document.getElementById('trsv_'+key); if(vEl)vEl.textContent=val;
-  const total=computeTRS();
-  const tEl=document.getElementById('trsTotal'); if(tEl){ tEl.textContent=total; tEl.style.color=trsColor(total); }
-}
 function toggleCheck(i){ readinessState[i]=!readinessState[i]; renderReadiness($('#viewRoot'),$('#topbarRight')); }
-function resetChecklist(){ Object.keys(readinessState).forEach(k=>readinessState[k]=false); trsState={}; renderReadiness($('#viewRoot'),$('#topbarRight')); }
+function resetChecklist(){ Object.keys(readinessState).forEach(k=>readinessState[k]=false); renderReadiness($('#viewRoot'),$('#topbarRight')); }
 function proceedToTrade(){
   // pass checklist completion snapshot to the trade
   window._pendingChecklist=state.checklistTemplate.map((_,i)=>!!readinessState[i]);
-  window._pendingTRS=computeTRS();
   resetChecklist();
   go('journal');
   openTradeForm();
@@ -1542,7 +1444,7 @@ function renderLessons(c,tb){
   if(!items.length){
     c.innerHTML=`<div class="card"><div class="empty">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-      <p>No lessons or incidents logged</p><span>Root-cause analysis for trading. Every losing trade or process failure becomes a documented incident with a severity, owner, status and prevention rule — just like an IT incident postmortem.</span>
+      <p>No lessons logged</p><span>Root-cause analysis for trading. Every mistake becomes a documented prevention rule — just like an incident postmortem.</span>
       <div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="openLessonForm()">Log a lesson</button></div>
     </div></div>`;
     return;
@@ -1550,7 +1452,7 @@ function renderLessons(c,tb){
   c.innerHTML=`<div style="max-width:820px">${items.map(l=>`
     <div class="lesson-card">
       <div class="row spread">
-        <div class="row" style="gap:8px;flex-wrap:wrap"><span class="pill" style="border-color:#3a2630;color:var(--loss)">${esc(l.category||'Mistake')}</span>${l.severity?`<span class="pill" style="border-color:${sevColor(l.severity)};color:${sevColor(l.severity)}">${esc(l.severity)}</span>`:''}<span class="pill" style="border-color:${incStatusColor(l.status)};color:${incStatusColor(l.status)}">${esc(l.status||'Open')}</span>${l.owner?`<span class="note-meta">@${esc(l.owner)}</span>`:''}<span class="note-meta">${fmtDate(l.created)}</span></div>
+        <div class="row" style="gap:8px"><span class="pill" style="border-color:#3a2630;color:var(--loss)">${esc(l.category||'Mistake')}</span><span class="note-meta">${fmtDate(l.created)}</span></div>
         <button class="btn btn-ghost btn-sm" onclick="openLessonForm('${l.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
       </div>
       <div style="margin-top:10px;display:grid;gap:8px">
@@ -1567,16 +1469,6 @@ function openLessonForm(id){
   openModal(`<div class="modal-head"><h3>${l?'Edit':'New'} Lesson (RCA)</h3><button class="close" onclick="closeModal()">✕</button></div>
     <div class="modal-body">
       <div class="field"><label>Category</label><select id="l_category">${['Mistake','Process Gap','Emotional','Risk Breach','Market Read','Execution'].map(x=>`<option ${l&&l.category===x?'selected':''}>${x}</option>`).join('')}</select></div>
-      <div class="field-row grid-3">
-        <div class="field"><label>Severity</label><select id="l_severity">${['','Low','Medium','High','Critical'].map(x=>`<option value="${x}" ${l&&l.severity===x?'selected':''}>${x||'—'}</option>`).join('')}</select></div>
-        <div class="field"><label>Status</label><select id="l_status">${['Open','Investigating','Resolved','Closed'].map(x=>`<option ${(l&&l.status===x)||(!l&&x==='Open')?'selected':''}>${x}</option>`).join('')}</select></div>
-        <div class="field"><label>Owner</label><input id="l_owner" placeholder="me" value="${l?esc(l.owner||''):''}"></div>
-      </div>
-      <div class="field"><label>Related trade (optional)</label>
-        <select id="l_tradeId"><option value="">— none —</option>
-          ${state.trades.slice().sort((a,b)=>(b.datetime||0)-(a.datetime||0)).map(tr=>`<option value="${tr.id}" ${l&&l.tradeId===tr.id?'selected':''}>${esc(tradeLabel(tr))}</option>`).join('')}
-        </select>
-      </div>
       <div class="field"><label>What happened (the mistake)</label><textarea id="l_mistake" placeholder="Moved my stop loss further away to avoid being stopped out">${l?esc(l.mistake):''}</textarea></div>
       <div class="field"><label>Root cause (the why)</label><textarea id="l_rootCause" placeholder="Couldn't accept being wrong — ego over process">${l?esc(l.rootCause):''}</textarea></div>
       <div class="field"><label>Resolution (what I did / should have done)</label><textarea id="l_resolution" placeholder="Closed at a larger loss than planned">${l?esc(l.resolution):''}</textarea></div>
@@ -1591,11 +1483,7 @@ function openLessonForm(id){
 function saveLesson(id){
   const data={category:$('#l_category').value,mistake:$('#l_mistake').value.trim(),
     rootCause:$('#l_rootCause').value.trim(),resolution:$('#l_resolution').value.trim(),
-    prevention:$('#l_prevention').value.trim(),
-    severity:$('#l_severity')?$('#l_severity').value:'',
-    status:$('#l_status')?$('#l_status').value:'Open',
-    owner:$('#l_owner')?$('#l_owner').value.trim():'',
-    tradeId:$('#l_tradeId')?($('#l_tradeId').value||null):null};
+    prevention:$('#l_prevention').value.trim()};
   if(!data.mistake){toast('Describe the mistake','err');return;}
   let newId=id;
   if(id){Object.assign(state.lessons.find(x=>x.id===id),data);toast('Lesson updated');}
@@ -1633,11 +1521,6 @@ function tradeLabel(t){
   const p=netPL(t);
   return `${esc(t.symbol||'—')} · ${fmtDate(t.datetime)} · ${p>=0?'+':''}${p.toFixed(0)}`;
 }
-function statusColor(s){
-  return {Request:'var(--txt-dim)',Checklist:'var(--info)',Approved:'var(--info)',Open:'var(--warn)',Monitoring:'var(--warn)',Closed:'var(--accent)',Cancelled:'var(--txt-faint)'}[s||'Open']||'var(--txt-dim)';
-}
-function sevColor(s){ return {Low:'var(--info)',Medium:'var(--warn)',High:'var(--loss)',Critical:'var(--loss)'}[s]||'var(--txt-dim)'; }
-function incStatusColor(s){ return {Open:'var(--loss)',Investigating:'var(--warn)',Resolved:'var(--info)',Closed:'var(--accent)'}[s||'Open']||'var(--txt-dim)'; }
 
 /* ============================================================
    CASE FILE  — connected view of trade + psychology + lessons
@@ -1953,345 +1836,6 @@ function saveLib(id){
 function deleteLib(id){
   confirmDialog('Remove this resource?',()=>{state.library=state.library.filter(r=>r.id!==id);save();closeModal();buildNav();toast('Removed','warn');renderView(currentView);},true);
 }
-
-/* ============================================================
-   WATCHLISTS & TRADE CANDIDATES  (manual entry + personal rating)
-   ============================================================ */
-function renderWatchlists(c,tb){
-  tb.innerHTML=`<button class="btn btn-primary btn-sm" onclick="openWatchlistForm()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Watchlist</button>`;
-  const wls=state.watchlists||[];
-  if(!wls.length){
-    c.innerHTML=`<div class="card"><div class="empty">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-      <p>No watchlists yet</p><span>Track symbols you're studying. For each one, log the AI's score and <b>your own confidence</b> — six months later you can measure how good your own judgment actually is. All manual entry; no live market data.</span>
-      <div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="openWatchlistForm()">Create a watchlist</button></div>
-    </div></div>`;
-    return;
-  }
-  c.innerHTML=`<div style="display:grid;gap:16px">${wls.map(w=>{
-    const syms=(w.symbols||[]).slice().sort((a,b)=>(b.added||0)-(a.added||0));
-    return `<div class="card">
-      <div class="card-head"><h3>${esc(w.name)}</h3>${w.note?`<span class="card-sub">${esc(w.note)}</span>`:''}
-        <div class="actions">
-          <button class="btn btn-sm" onclick="openSymbolForm('${w.id}')">+ Symbol</button>
-          <button class="btn btn-ghost btn-sm" onclick="openWatchlistForm('${w.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-        </div>
-      </div>
-      ${syms.length?`<div class="table-wrap" style="border:none"><table>
-        <thead><tr><th>Symbol</th><th class="num">AI Score</th><th class="num">My Confidence</th><th class="num">Δ</th><th>My Reason</th><th></th></tr></thead>
-        <tbody>${syms.map(s=>{
-          const ai=s.aiScore!=null&&s.aiScore!==''?Number(s.aiScore):null;
-          const mc=s.myConf!=null&&s.myConf!==''?Number(s.myConf):null;
-          const delta=(ai!=null&&mc!=null)?(mc-ai):null;
-          return `<tr ondblclick="openSymbolForm('${w.id}','${s.id}')">
-            <td style="font-weight:600">${esc(s.symbol)}</td>
-            <td class="num">${ai!=null?ai:'—'}</td>
-            <td class="num">${mc!=null?mc:'—'}</td>
-            <td class="num ${delta==null?'dim':delta>0?'pos':delta<0?'neg':'dim'}">${delta==null?'—':(delta>0?'+':'')+delta}</td>
-            <td style="font-size:12px;color:var(--txt-dim)">${esc(s.reason||'')}</td>
-            <td class="num"><button class="btn btn-ghost btn-sm" onclick="openSymbolForm('${w.id}','${s.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td>
-          </tr>`;
-        }).join('')}</tbody></table></div>
-        <div class="note-meta" style="margin-top:8px">Δ = your confidence minus the AI score. Watch whether your edge over the AI is real over time.</div>`
-      :`<div class="note-meta" style="padding:8px 0">No symbols yet. Add one to start tracking.</div>`}
-    </div>`;
-  }).join('')}</div>`;
-}
-function openWatchlistForm(id){
-  const w=id?state.watchlists.find(x=>x.id===id):null;
-  openModal(`<div class="modal-head"><h3>${w?'Edit':'New'} Watchlist</h3><button class="close" onclick="closeModal()">✕</button></div>
-    <div class="modal-body">
-      <div class="field"><label>Name</label><input id="w_name" placeholder="Core ETFs / AI Watchlist / Dividend" value="${w?esc(w.name):''}"></div>
-      <div class="field"><label>Note (optional)</label><input id="w_note" placeholder="purpose of this list" value="${w?esc(w.note||''):''}"></div>
-    </div>
-    <div class="modal-foot">
-      ${w?`<button class="btn btn-danger" onclick="deleteWatchlist('${w.id}')" style="margin-right:auto">Delete</button>`:''}
-      <button class="btn" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveWatchlist('${id||''}')">${w?'Save':'Add'}</button>
-    </div>`);
-}
-function saveWatchlist(id){
-  const name=$('#w_name').value.trim(); if(!name){toast('Name required','err');return;}
-  const note=$('#w_note').value.trim();
-  if(id){const w=state.watchlists.find(x=>x.id===id);w.name=name;w.note=note;toast('Updated');}
-  else{state.watchlists.push({id:uid(),name,note,created:Date.now(),symbols:[]});toast('Watchlist created');}
-  save();closeModal();buildNav();renderView(currentView);
-}
-function deleteWatchlist(id){
-  confirmDialog('Delete this watchlist and all its symbols?',()=>{state.watchlists=state.watchlists.filter(w=>w.id!==id);save();closeModal();buildNav();toast('Deleted','warn');renderView(currentView);},true);
-}
-function openSymbolForm(wid,sid){
-  const w=state.watchlists.find(x=>x.id===wid); if(!w)return;
-  const s=sid?(w.symbols||[]).find(x=>x.id===sid):null;
-  openModal(`<div class="modal-head"><h3>${s?'Edit':'Add'} Symbol</h3><button class="close" onclick="closeModal()">✕</button></div>
-    <div class="modal-body">
-      <div class="field-row grid-3">
-        <div class="field"><label>Symbol</label><input id="s_symbol" placeholder="NVDA" value="${s?esc(s.symbol):''}"></div>
-        <div class="field"><label>AI Score (0–100)</label><input type="number" min="0" max="100" id="s_aiScore" placeholder="optional" value="${s&&s.aiScore!=null?s.aiScore:''}"></div>
-        <div class="field"><label>My Confidence (0–100)</label><input type="number" min="0" max="100" id="s_myConf" placeholder="your call" value="${s&&s.myConf!=null?s.myConf:''}"></div>
-      </div>
-      <div class="field"><label>My reason / thesis</label><textarea id="s_reason" placeholder="Why this, and why now? What would change your mind?">${s?esc(s.reason||''):''}</textarea></div>
-      <div class="note-meta">AI Score is something you record manually (e.g. after asking the AI Insights coach about a symbol). This app holds no live market data.</div>
-    </div>
-    <div class="modal-foot">
-      ${s?`<button class="btn btn-danger" onclick="deleteSymbol('${wid}','${s.id}')" style="margin-right:auto">Delete</button>`:''}
-      <button class="btn" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveSymbol('${wid}','${sid||''}')">${s?'Save':'Add'}</button>
-    </div>`,true);
-}
-function saveSymbol(wid,sid){
-  const w=state.watchlists.find(x=>x.id===wid); if(!w)return;
-  const sym=$('#s_symbol').value.trim().toUpperCase(); if(!sym){toast('Symbol required','err');return;}
-  const ai=$('#s_aiScore').value, mc=$('#s_myConf').value;
-  const data={symbol:sym,aiScore:ai===''?null:Number(ai),myConf:mc===''?null:Number(mc),reason:$('#s_reason').value.trim()};
-  w.symbols=w.symbols||[];
-  if(sid){Object.assign(w.symbols.find(x=>x.id===sid),data);toast('Updated');}
-  else{data.id=uid();data.added=Date.now();w.symbols.push(data);toast('Symbol added');}
-  save();closeModal();buildNav();renderView(currentView);
-}
-function deleteSymbol(wid,sid){
-  const w=state.watchlists.find(x=>x.id===wid); if(!w)return;
-  w.symbols=(w.symbols||[]).filter(s=>s.id!==sid);save();closeModal();buildNav();toast('Removed','warn');renderView(currentView);
-}
-
-/* ============================================================
-   LEARNING PROGRESS  (manual skill levels)
-   ============================================================ */
-function renderSkills(c,tb){
-  tb.innerHTML=`<button class="btn btn-primary btn-sm" onclick="openSkillForm()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Skill</button>`;
-  const sk=state.skills||[];
-  if(!sk.length){
-    c.innerHTML=`<div class="card"><div class="empty">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
-      <p>No skills tracked</p><span>Track your learning like a training programme. Set a level 0–100 for each area as you progress through foundations → risk → options → futures.</span>
-      <div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="openSkillForm()">Add a skill</button></div>
-    </div></div>`;
-    return;
-  }
-  const avg=Math.round(sk.reduce((a,s)=>a+(Number(s.level)||0),0)/sk.length);
-  c.innerHTML=`<div style="max-width:720px">
-    <div class="card mb"><div class="row spread"><div><div class="note-meta" style="text-transform:uppercase;letter-spacing:.06em">Overall progress</div><div class="num" style="font-size:24px;font-weight:700">${avg}%</div></div>
-      <div style="flex:1;max-width:380px;margin-left:24px"><div class="score-bar"><div style="width:${avg}%;height:100%;background:var(--accent);border-radius:inherit"></div></div></div></div></div>
-    ${sk.map(s=>{
-      const lv=Number(s.level)||0;
-      const col=lv>=80?'var(--accent)':lv>=50?'var(--warn)':'var(--info)';
-      return `<div class="card mb">
-        <div class="row spread"><div style="font-weight:600">${esc(s.name)}</div>
-          <div class="row" style="gap:8px"><span class="num" style="color:${col};font-weight:600">${lv}%</span>
-            <button class="btn btn-ghost btn-sm" onclick="openSkillForm('${s.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-          </div></div>
-        <div class="score-bar" style="margin-top:10px"><div style="width:${lv}%;height:100%;background:${col};border-radius:inherit"></div></div>
-        ${s.note?`<div class="note-meta" style="margin-top:8px">${esc(s.note)}</div>`:''}
-      </div>`;
-    }).join('')}
-  </div>`;
-}
-function openSkillForm(id){
-  const s=id?state.skills.find(x=>x.id===id):null;
-  openModal(`<div class="modal-head"><h3>${s?'Edit':'New'} Skill</h3><button class="close" onclick="closeModal()">✕</button></div>
-    <div class="modal-body">
-      <div class="field"><label>Skill area</label><input id="sk_name" placeholder="Options" value="${s?esc(s.name):''}"></div>
-      <div class="field"><label>Level: <span id="skv">${s?s.level||0:0}</span>%</label>
-        <input type="range" min="0" max="100" step="5" id="sk_level" value="${s?s.level||0:0}" oninput="document.getElementById('skv').textContent=this.value"></div>
-      <div class="field"><label>Note (optional)</label><textarea id="sk_note" placeholder="What's next to reach the next level?">${s?esc(s.note||''):''}</textarea></div>
-    </div>
-    <div class="modal-foot">
-      ${s?`<button class="btn btn-danger" onclick="deleteSkill('${s.id}')" style="margin-right:auto">Delete</button>`:''}
-      <button class="btn" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveSkill('${id||''}')">${s?'Save':'Add'}</button>
-    </div>`);
-}
-function saveSkill(id){
-  const name=$('#sk_name').value.trim(); if(!name){toast('Name required','err');return;}
-  const data={name,level:Number($('#sk_level').value),note:$('#sk_note').value.trim()};
-  if(id){Object.assign(state.skills.find(x=>x.id===id),data);toast('Updated');}
-  else{data.id=uid();state.skills.push(data);toast('Skill added');}
-  save();closeModal();buildNav();renderView(currentView);
-}
-function deleteSkill(id){
-  confirmDialog('Remove this skill?',()=>{state.skills=state.skills.filter(s=>s.id!==id);save();closeModal();buildNav();toast('Removed','warn');renderView(currentView);},true);
-}
-
-/* ============================================================
-   INCOME & DIVIDENDS  (holdings forecast + payout actuals)
-   ============================================================ */
-const DIV_FREQ={Weekly:52,Monthly:12,Quarterly:4,'Semi-annual':2,Annual:1};
-function holdingAnnualIncome(h){
-  // priority: explicit annualDividend per share, else yield% × price
-  const shares=Number(h.shares)||0;
-  if(h.annualDividend!=null && h.annualDividend!=='') return shares*Number(h.annualDividend);
-  if(h.yieldPct!=null && h.yieldPct!=='' && h.price!=null && h.price!=='') return shares*Number(h.price)*(Number(h.yieldPct)/100);
-  return 0;
-}
-function renderIncome(c,tb){
-  tb.innerHTML=`<button class="btn btn-sm" onclick="openDividendForm()">Log Payout</button>
-    <button class="btn btn-primary btn-sm" onclick="openHoldingForm()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Holding</button>`;
-  const holdings=state.holdings||[]; const divs=(state.dividends||[]);
-  if(!holdings.length && !divs.length){
-    c.innerHTML=`<div class="card"><div class="empty">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-      <p>No holdings or payouts yet</p><span>Manually enter your ETF/dividend holdings to forecast income and build a 12-month calendar, then log each payout as it lands to track actuals against the forecast. All manual — no live market data.</span>
-      <div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="openHoldingForm()">Add a holding</button></div>
-    </div></div>`;
-    return;
-  }
-  const annualForecast=holdings.reduce((a,h)=>a+holdingAnnualIncome(h),0);
-  const portfolioValue=holdings.reduce((a,h)=>a+((Number(h.shares)||0)*(Number(h.price)||0)),0);
-  const portYield=portfolioValue>0?(annualForecast/portfolioValue*100):0;
-  // actuals: this calendar year
-  const yr=new Date().getFullYear();
-  const ytdActual=divs.filter(d=>new Date(d.datetime).getFullYear()===yr).reduce((a,d)=>a+(Number(d.amount)||0),0);
-  // monthly forecast buckets (spread each holding's annual income across its pay months evenly)
-  const monthly=new Array(12).fill(0);
-  holdings.forEach(h=>{
-    const annual=holdingAnnualIncome(h); const n=DIV_FREQ[h.frequency]||4;
-    const perMonth=annual/12; // simple even spread for forecasting
-    for(let i=0;i<12;i++) monthly[i]+=perMonth;
-  });
-  const monthlyActual=new Array(12).fill(0);
-  divs.filter(d=>new Date(d.datetime).getFullYear()===yr).forEach(d=>{ monthlyActual[new Date(d.datetime).getMonth()]+=Number(d.amount)||0; });
-  const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-  c.innerHTML=`
-  <div class="stat-grid" style="margin-bottom:18px">
-    <div class="stat"><div class="k">Forecast / Year</div><div class="v num">${money(annualForecast)}</div></div>
-    <div class="stat"><div class="k">Forecast / Month</div><div class="v num">${money(annualForecast/12)}</div></div>
-    <div class="stat"><div class="k">Portfolio Yield</div><div class="v num">${portYield.toFixed(2)}%</div></div>
-    <div class="stat"><div class="k">Received ${yr}</div><div class="v num pos">${money(ytdActual)}</div></div>
-  </div>
-
-  <div class="card mb">
-    <div class="card-head"><h3>Dividend Calendar — ${yr}</h3><span class="card-sub">forecast vs actual by month</span></div>
-    <div class="table-wrap" style="border:none"><table>
-      <thead><tr><th>Month</th><th class="num">Forecast</th><th class="num">Actual</th><th class="num">Δ</th></tr></thead>
-      <tbody>${monthNames.map((mn,i)=>{
-        const f=monthly[i], a=monthlyActual[i], d=a-f;
-        return `<tr><td>${mn}</td><td class="num dim">${money(f)}</td><td class="num ${a>0?'pos':'dim'}">${a>0?money(a):'—'}</td><td class="num ${a===0?'dim':d>=0?'pos':'neg'}">${a===0?'—':(d>=0?'+':'')+money(d)}</td></tr>`;
-      }).join('')}</tbody>
-    </table></div>
-    <div class="note-meta" style="margin-top:8px">Forecast spreads each holding's annual income evenly across the year. Log actual payouts to see the real shape.</div>
-  </div>
-
-  <div class="card mb">
-    <div class="card-head"><h3>Holdings</h3><span class="card-sub">${holdings.length} position${holdings.length!==1?'s':''}</span>
-      <div class="actions"><button class="btn btn-sm" onclick="openHoldingForm()">+ Holding</button></div></div>
-    ${holdings.length?`<div class="table-wrap" style="border:none"><table>
-      <thead><tr><th>Symbol</th><th class="num">Shares</th><th class="num">Price</th><th class="num">Value</th><th>Freq</th><th class="num">Yield</th><th class="num">Income/yr</th><th></th></tr></thead>
-      <tbody>${holdings.map(h=>{
-        const val=(Number(h.shares)||0)*(Number(h.price)||0); const inc=holdingAnnualIncome(h);
-        const y=val>0?(inc/val*100):0;
-        return `<tr ondblclick="openHoldingForm('${h.id}')">
-          <td style="font-weight:600">${esc(h.symbol)}${h.name?`<div class="note-meta">${esc(h.name)}</div>`:''}</td>
-          <td class="num">${Number(h.shares)||0}</td>
-          <td class="num">${h.price?Number(h.price).toFixed(2):'—'}</td>
-          <td class="num">${money(val)}</td>
-          <td>${esc(h.frequency||'Quarterly')}</td>
-          <td class="num">${y.toFixed(2)}%</td>
-          <td class="num pos">${money(inc)}</td>
-          <td class="num"><button class="btn btn-ghost btn-sm" onclick="openHoldingForm('${h.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td>
-        </tr>`;
-      }).join('')}</tbody></table></div>`:`<div class="note-meta" style="padding:8px 0">No holdings yet.</div>`}
-  </div>
-
-  <div class="card">
-    <div class="card-head"><h3>Payout Log</h3><span class="card-sub">actual dividends received</span>
-      <div class="actions"><button class="btn btn-sm" onclick="openDividendForm()">+ Payout</button></div></div>
-    ${divs.length?`<div class="table-wrap" style="border:none"><table>
-      <thead><tr><th>Date</th><th>Symbol</th><th class="num">Per Share</th><th class="num">Shares</th><th class="num">Amount</th><th>Note</th><th></th></tr></thead>
-      <tbody>${divs.slice().sort((a,b)=>(b.datetime||0)-(a.datetime||0)).map(d=>`
-        <tr ondblclick="openDividendForm('${d.id}')">
-          <td>${fmtDate(d.datetime)}</td><td style="font-weight:600">${esc(d.symbol||'—')}</td>
-          <td class="num dim">${d.perShare?Number(d.perShare).toFixed(4):'—'}</td>
-          <td class="num dim">${d.shares||'—'}</td>
-          <td class="num pos">${money(Number(d.amount)||0)}</td>
-          <td style="font-size:12px;color:var(--txt-dim)">${esc(d.note||'')}</td>
-          <td class="num"><button class="btn btn-ghost btn-sm" onclick="openDividendForm('${d.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td>
-        </tr>`).join('')}</tbody></table></div>`:`<div class="note-meta" style="padding:8px 0">No payouts logged yet.</div>`}
-  </div>`;
-}
-function openHoldingForm(id){
-  const h=id?state.holdings.find(x=>x.id===id):null;
-  openModal(`<div class="modal-head"><h3>${h?'Edit':'Add'} Holding</h3><button class="close" onclick="closeModal()">✕</button></div>
-    <div class="modal-body">
-      <div class="field-row grid-2">
-        <div class="field"><label>Symbol</label><input id="h_symbol" placeholder="SCHD" value="${h?esc(h.symbol):''}"></div>
-        <div class="field"><label>Name (optional)</label><input id="h_name" placeholder="Schwab US Dividend" value="${h?esc(h.name||''):''}"></div>
-      </div>
-      <div class="field-row grid-3">
-        <div class="field"><label>Shares</label><input type="number" step="any" id="h_shares" value="${h&&h.shares!=null?h.shares:''}"></div>
-        <div class="field"><label>Price (${cur()})</label><input type="number" step="any" id="h_price" value="${h&&h.price!=null?h.price:''}"></div>
-        <div class="field"><label>Frequency</label><select id="h_frequency">${Object.keys(DIV_FREQ).map(f=>`<option ${(h&&h.frequency===f)||(!h&&f==='Quarterly')?'selected':''}>${f}</option>`).join('')}</select></div>
-      </div>
-      <div class="field-row grid-2">
-        <div class="field"><label>Annual dividend / share (${cur()})</label><input type="number" step="any" id="h_annualDividend" placeholder="if known" value="${h&&h.annualDividend!=null?h.annualDividend:''}"></div>
-        <div class="field"><label>or Yield %</label><input type="number" step="any" id="h_yieldPct" placeholder="e.g. 3.5" value="${h&&h.yieldPct!=null?h.yieldPct:''}"></div>
-      </div>
-      <div class="field"><label>Note</label><input id="h_note" value="${h?esc(h.note||''):''}"></div>
-      <div class="note-meta">Income is computed from annual dividend/share if given, otherwise yield% × price. Forecast is your own estimate — not live data.</div>
-    </div>
-    <div class="modal-foot">
-      ${h?`<button class="btn btn-danger" onclick="deleteHolding('${h.id}')" style="margin-right:auto">Delete</button>`:''}
-      <button class="btn" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveHolding('${id||''}')">${h?'Save':'Add'}</button>
-    </div>`,true);
-}
-function saveHolding(id){
-  const sym=$('#h_symbol').value.trim().toUpperCase(); if(!sym){toast('Symbol required','err');return;}
-  const data={symbol:sym,name:$('#h_name').value.trim(),shares:num('h_shares'),price:num('h_price'),
-    frequency:$('#h_frequency').value,annualDividend:num('h_annualDividend'),yieldPct:num('h_yieldPct'),note:$('#h_note').value.trim()};
-  if(id){Object.assign(state.holdings.find(x=>x.id===id),data);toast('Updated');}
-  else{data.id=uid();data.created=Date.now();state.holdings.push(data);toast('Holding added');}
-  save();closeModal();buildNav();renderView(currentView);
-}
-function deleteHolding(id){
-  confirmDialog('Remove this holding? Logged payouts are kept.',()=>{state.holdings=state.holdings.filter(h=>h.id!==id);save();closeModal();buildNav();toast('Removed','warn');renderView(currentView);},true);
-}
-function openDividendForm(id){
-  const d=id?state.dividends.find(x=>x.id===id):null;
-  const hopts=(state.holdings||[]).map(h=>`<option value="${h.id}" ${d&&d.holdingId===h.id?'selected':''}>${esc(h.symbol)}</option>`).join('');
-  openModal(`<div class="modal-head"><h3>${d?'Edit':'Log'} Dividend Payout</h3><button class="close" onclick="closeModal()">✕</button></div>
-    <div class="modal-body">
-      <div class="field-row grid-2">
-        <div class="field"><label>Date</label><input type="datetime-local" id="d_datetime" value="${d?new Date(d.datetime).toISOString().slice(0,16):todayISO()}"></div>
-        <div class="field"><label>Linked holding (optional)</label><select id="d_holdingId" onchange="syncDivSymbol()"><option value="">— manual —</option>${hopts}</select></div>
-      </div>
-      <div class="field-row grid-3">
-        <div class="field"><label>Symbol</label><input id="d_symbol" placeholder="SCHD" value="${d?esc(d.symbol||''):''}"></div>
-        <div class="field"><label>Per share (${cur()})</label><input type="number" step="any" id="d_perShare" value="${d&&d.perShare!=null?d.perShare:''}"></div>
-        <div class="field"><label>Shares</label><input type="number" step="any" id="d_shares" value="${d&&d.shares!=null?d.shares:''}"></div>
-      </div>
-      <div class="field"><label>Amount received (${cur()})</label><input type="number" step="any" id="d_amount" placeholder="auto = per share × shares" value="${d&&d.amount!=null?d.amount:''}"></div>
-      <div class="field"><label>Note</label><input id="d_note" value="${d?esc(d.note||''):''}"></div>
-    </div>
-    <div class="modal-foot">
-      ${d?`<button class="btn btn-danger" onclick="deleteDividend('${d.id}')" style="margin-right:auto">Delete</button>`:''}
-      <button class="btn" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveDividend('${id||''}')">${d?'Save':'Log'}</button>
-    </div>`,true);
-}
-function syncDivSymbol(){
-  const hid=$('#d_holdingId').value; if(!hid)return;
-  const h=(state.holdings||[]).find(x=>x.id===hid);
-  if(h){ $('#d_symbol').value=h.symbol; if(!$('#d_shares').value && h.shares!=null)$('#d_shares').value=h.shares; }
-}
-function saveDividend(id){
-  const sym=$('#d_symbol').value.trim().toUpperCase();
-  let amount=num('d_amount'); const per=num('d_perShare'), sh=num('d_shares');
-  if(amount==null && per!=null && sh!=null) amount=per*sh;
-  if(amount==null){toast('Enter an amount (or per share × shares)','err');return;}
-  const data={datetime:new Date($('#d_datetime').value).getTime(),symbol:sym,holdingId:$('#d_holdingId').value||null,
-    perShare:per,shares:sh,amount,note:$('#d_note').value.trim(),tradeId:(id?state.dividends.find(x=>x.id===id).tradeId:null)||null};
-  if(id){Object.assign(state.dividends.find(x=>x.id===id),data);toast('Updated');}
-  else{data.id=uid();state.dividends.push(data);toast('Payout logged');}
-  save();closeModal();buildNav();renderView(currentView);
-}
-function deleteDividend(id){
-  confirmDialog('Delete this payout record?',()=>{state.dividends=state.dividends.filter(d=>d.id!==id);save();closeModal();buildNav();toast('Deleted','warn');renderView(currentView);},true);
-}
-
 /* ============================================================
    ANALYTICS
    ============================================================ */
@@ -2413,7 +1957,6 @@ function renderAI(c,tb){
         <button class="btn btn-sm" onclick="runAI('behaviour')">Behaviour Analysis</button>
         <button class="btn btn-sm" onclick="runAI('risk')">Risk Warnings</button>
         <button class="btn btn-sm" onclick="runAI('improve')">Improvement Plan</button>
-        <button class="btn btn-sm" onclick="runAI('rca')">RCA: Loss Patterns</button>
       </div>
     </div>
     <div id="aiResult"></div>
@@ -2429,13 +1972,12 @@ function buildAIContext(){
       date:fmtDate(t.datetime),sym:t.symbol,dir:t.direction,strat:strategyName(t.strategyId),
       grade:t.setupGrade,entry:t.entry,stop:t.stop,exit:t.exit,risk:t.riskAmount,
       net:Number(netPL(t).toFixed(2)),R:rMultiple(t)!=null?Number(rMultiple(t).toFixed(2)):null,notes:t.notes,
-      status:t.status||null, trs:t.trs!=null?t.trs:null,
       mindset: psych?{mood:psych.mood,confidence:psych.confidence,stress:psych.stress,energy:psych.energy,followedRules:psych.compliance}:null,
       lessons: linkedLessons.length?linkedLessons.map(l=>l.mistake):null
     };
   });
   const psych=state.psych.slice(-15).map(p=>({date:fmtDate(p.datetime),mood:p.mood,confidence:p.confidence,stress:p.stress,energy:p.energy,followedRules:p.compliance,note:p.note}));
-  const lessons=state.lessons.slice(-10).map(l=>({cat:l.category,severity:l.severity,status:l.status,mistake:l.mistake,rootCause:l.rootCause,prevention:l.prevention}));
+  const lessons=state.lessons.slice(-10).map(l=>({cat:l.category,mistake:l.mistake,rootCause:l.rootCause,prevention:l.prevention}));
   return {
     summary:{currency:cur(),netCapital:m.capitalBase,deposits:m.deposits,withdrawals:m.withdrawals,currentEquity:Number(m.finalEquity.toFixed(2)),trades:m.n,winRate:Math.round(m.winRate),
       profitFactor:m.profitFactor===Infinity?'inf':Number(m.profitFactor.toFixed(2)),expectancy:Number(m.expectancy.toFixed(2)),
@@ -2451,10 +1993,9 @@ const AI_PROMPTS={
   monthly:'Act as a trading performance coach. Give a monthly performance review: overall trajectory, strengths, recurring weaknesses, and whether the trader is showing readiness to scale up risk or should keep position sizes small.',
   behaviour:'Act as a trading psychologist. Cross-reference the psychology log with trade outcomes. Identify behavioural patterns (e.g. does stress or low energy correlate with losses, signs of revenge trading or overtrading). Be specific and reference the data.',
   risk:'Act as a risk manager. Scan the data for risk red flags: oversized losses beyond planned risk, widening stops, loss streaks, missing risk amounts, low risk score. List concrete warnings ranked by severity.',
-  improve:'Act as a trading mentor. Based on all the data, give a focused improvement plan: the single highest-leverage thing to fix first, then 2-3 supporting habits. Keep it practical and process-oriented.',
-  rca:'Act as an incident analyst doing root-cause analysis on losing trades, in the style of an IT operations RCA. Look across all losing trades and logged incidents/lessons. Identify the top 2-3 recurring root causes (e.g. entering before confirmation, widening stops, trading in poor psychological states). For each, estimate roughly how often it appears, cite the supporting data points, and state one concrete preventive control. Note any relationship between Trade Readiness Score (trs) and outcome if the data allows. Be specific and quantitative where possible.'
+  improve:'Act as a trading mentor. Based on all the data, give a focused improvement plan: the single highest-leverage thing to fix first, then 2-3 supporting habits. Keep it practical and process-oriented.'
 };
-const AI_TITLES={daily:'Daily Review',weekly:'Weekly Review',monthly:'Monthly Review',behaviour:'Behaviour Analysis',risk:'Risk Warnings',improve:'Improvement Plan',rca:'RCA: Loss Patterns'};
+const AI_TITLES={daily:'Daily Review',weekly:'Weekly Review',monthly:'Monthly Review',behaviour:'Behaviour Analysis',risk:'Risk Warnings',improve:'Improvement Plan'};
 
 async function runAI(kind){
   const m=computeMetrics();
@@ -2671,6 +2212,31 @@ function renderSettings(c,tb){
     </div>
 
     <div class="card mb">
+      <div class="card-head"><h3>Cloud / Folder Sync</h3><span class="card-sub">${fsAccessSupported()?'file-linked sync':'download/import fallback'}</span></div>
+      <p class="note-meta" style="margin-bottom:14px;line-height:1.6">Sync moves your data between devices through a single JSON file in <b>your own cloud</b> (e.g. iCloud Drive, Dropbox or Google Drive folder). The app writes the file; your cloud propagates it. <b style="color:var(--warn)">No data is sent to any server</b> — sync is just reading and writing your file.</p>
+      <label style="display:block;margin-bottom:12px">Sync target
+        <select onchange="setSyncTarget(this.value)" style="margin-top:6px">
+          <option value="local" ${syncTarget()==='local'?'selected':''}>Local file only (manual export/import)</option>
+          <option value="file" ${syncTarget()==='file'?'selected':''}>iCloud / synced folder (pick a file)</option>
+        </select>
+      </label>
+      ${syncTarget()==='file'?`
+      <div class="row wrap" style="gap:8px">
+        ${fsAccessSupported()?`
+        <button class="btn btn-primary" onclick="syncChooseFile()">${_syncHandle?'Re-link sync file':'Choose sync file'}</button>
+        <button class="btn" onclick="syncPush()" ${_syncHandle?'':'disabled'}>Push (save to cloud)</button>
+        <button class="btn" onclick="syncPull()">Pull (load from cloud)</button>`:`
+        <button class="btn btn-primary" onclick="exportData()">Export to save into cloud folder</button>
+        <button class="btn" onclick="document.getElementById('importFile').click()">Import from cloud folder</button>`}
+      </div>
+      <div class="note-meta" style="margin-top:12px;line-height:1.6">
+        ${fsAccessSupported()
+          ? `Linked file: <b>${_syncHandle?esc(_syncHandle.name):'none yet'}</b>. Choose it once inside your cloud folder; Push writes the latest, Pull replaces local data with the file. Conflict rule: <b>last write wins</b>.`
+          : `This device (likely iOS Safari) can’t link a file directly. Use <b>Export</b> and save into your iCloud Drive folder, then <b>Import</b> that file on each device. The Files app shows iCloud Drive as a normal folder.`}
+      </div>`:''}
+    </div>
+
+    <div class="card mb">
       <div class="card-head"><h3>Auto-backup reminder</h3></div>
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
         <input type="checkbox" id="set_autoremind" ${s.autoRemind?'checked':''} style="width:auto" onchange="state.settings.autoRemind=this.checked;save()">
@@ -2707,43 +2273,112 @@ function exportData(){
   updateBackupBanner();
   toast('Backup downloaded');
 }
+// Parse + validate a backup string into a state object (throws on invalid)
+function parseBackup(text){
+  const data=JSON.parse(text);
+  if(!data || typeof data!=='object' || !('trades' in data)) throw new Error('Not a valid backup file');
+  return data;
+}
+// Apply a validated backup object as the new state (shared by file import + sync pull)
+function restoreFromObject(data, label){
+  confirmDialog(`Restore from ${label}? This replaces all current data (${state.trades.length} trades) with the backup (${(data.trades||[]).length} trades).`,()=>{
+    state=migrate(data); pruneDanglingLinks(); save(); buildNav(); go('dashboard'); toast('Backup restored');
+  },false);
+}
 function importData(input){
   const file=input.files[0]; if(!file)return;
   const reader=new FileReader();
   reader.onload=e=>{
-    try{
-      const data=JSON.parse(e.target.result);
-      if(!data || typeof data!=='object' || !('trades' in data)) throw new Error('Not a valid backup file');
-      confirmDialog(`Restore from "${file.name}"? This replaces all current data (${state.trades.length} trades) with the backup (${(data.trades||[]).length} trades).`,()=>{
-        state=migrate(data); pruneDanglingLinks(); save(); buildNav(); go('dashboard'); toast('Backup restored');
-      },false);
-    }catch(err){ toast('Import failed: '+err.message,'err'); }
+    try{ restoreFromObject(parseBackup(e.target.result), `"${file.name}"`); }
+    catch(err){ toast('Import failed: '+err.message,'err'); }
     input.value='';
   };
   reader.readAsText(file);
+}
+
+/* ---------- Cloud / Folder Sync ----------
+   syncTarget: 'local' | 'file'
+   'local' = manual export/import only.
+   'file'  = a single JSON file the user picks once (e.g. in iCloud Drive / a
+             synced folder). Uses the File System Access API where available
+             (Chrome/Edge desktop, Android). iOS Safari has no FS Access API,
+             so it falls back to download (Save to Files -> iCloud) + manual pick. */
+let _syncHandle = null;   // FileSystemFileHandle, kept for the session
+function fsAccessSupported(){
+  return typeof window!=='undefined' && 'showSaveFilePicker' in window && 'showOpenFilePicker' in window;
+}
+function syncTarget(){ return (state.settings && state.settings.syncTarget) || 'local'; }
+function setSyncTarget(v){ state.settings.syncTarget=v; save(); renderView('settings'); }
+
+async function syncChooseFile(){
+  if(!fsAccessSupported()){
+    toast('This browser/device can’t pick a folder file. Use Export, save it into your cloud folder, then Import on each device.','warn');
+    return;
+  }
+  try{
+    _syncHandle = await window.showSaveFilePicker({
+      suggestedName:'tradeops-sync.json',
+      types:[{description:'TradeOps backup', accept:{'application/json':['.json']}}]
+    });
+    toast('Sync file linked: '+_syncHandle.name);
+    await syncPush(true);
+    renderView('settings');
+  }catch(err){ if(err && err.name!=='AbortError') toast('Could not link file: '+err.message,'err'); }
+}
+
+async function syncPush(silent){
+  if(!fsAccessSupported() || !_syncHandle){
+    // Fallback: behave like a normal export the user drops into their cloud folder.
+    if(!silent) exportData();
+    return;
+  }
+  try{
+    const w = await _syncHandle.createWritable();
+    await w.write(JSON.stringify(state,null,2));
+    await w.close();
+    state._dirtySinceExport=false;
+    state.lastExport={count:state.trades.length, at:Date.now()};
+    _origSave(); bannerDismissed=false; updateBackupBanner();
+    if(!silent) toast('Synced to '+_syncHandle.name);
+  }catch(err){ toast('Sync push failed: '+err.message,'err'); }
+}
+
+async function syncPull(){
+  if(!fsAccessSupported()){
+    // Fallback: use the standard import file picker.
+    document.getElementById('importFile').click();
+    return;
+  }
+  try{
+    if(!_syncHandle){
+      const [h] = await window.showOpenFilePicker({
+        types:[{description:'TradeOps backup', accept:{'application/json':['.json']}}]
+      });
+      _syncHandle = h;
+    }
+    const file = await _syncHandle.getFile();
+    const text = await file.text();
+    restoreFromObject(parseBackup(text), 'cloud file “'+_syncHandle.name+'”');
+  }catch(err){ if(err && err.name!=='AbortError') toast('Sync pull failed: '+err.message,'err'); }
 }
 // Strip references to psych/lesson records that don't exist (e.g. hand-edited backups)
 function pruneDanglingLinks(){
   const psychIds=new Set(state.psych.map(p=>p.id));
   const lessonIds=new Set(state.lessons.map(l=>l.id));
-  const tradeIds=new Set(state.trades.map(t=>t.id));
-  const holdingIds=new Set((state.holdings||[]).map(h=>h.id));
   state.trades.forEach(t=>{
     if(t.psychId && !psychIds.has(t.psychId)) t.psychId=null;
     if(Array.isArray(t.lessonIds)) t.lessonIds=t.lessonIds.filter(id=>lessonIds.has(id));
   });
-  (state.lessons||[]).forEach(l=>{ if(l.tradeId && !tradeIds.has(l.tradeId)) l.tradeId=null; });
-  (state.dividends||[]).forEach(d=>{ if(d.holdingId && !holdingIds.has(d.holdingId)) d.holdingId=null; });
 }
 function exportCSV(){
   if(!state.trades.length){toast('No trades to export','warn');return;}
-  const cols=['datetime','symbol','assetClass','direction','status','trs','strategy','setupGrade','entry','stop','target','exit','size','riskAmount','commission','grossPL','netPL','rMultiple','notes',
+  const cols=['datetime','symbol','assetClass','direction','strategy','setupGrade','entry','stop','target','exit','size','riskAmount','commission','grossPL','netPL','rMultiple','notes',
     'linkedMood','linkedConfidence','linkedStress','linkedEnergy','linkedFollowedRules','linkedLessons'];
   const rows=state.trades.slice().sort((a,b)=>(a.datetime||0)-(b.datetime||0)).map(t=>{
     const r=rMultiple(t);
     const psych=t.psychId?state.psych.find(x=>x.id===t.psychId):null;
     const lessons=(t.lessonIds||[]).map(id=>{const l=state.lessons.find(x=>x.id===id);return l?(l.mistake||'lesson'):'';}).filter(Boolean);
-    return [new Date(t.datetime).toISOString(),t.symbol,t.assetClass,t.direction,t.status||'',t.trs!=null?t.trs:'',strategyName(t.strategyId),t.setupGrade,
+    return [new Date(t.datetime).toISOString(),t.symbol,t.assetClass,t.direction,strategyName(t.strategyId),t.setupGrade,
       t.entry,t.stop,t.target,t.exit,t.size,t.riskAmount,t.commission,t.grossPL,netPL(t),r!=null?r.toFixed(3):'',(t.notes||'').replace(/\n/g,' '),
       psych?psych.mood:'', psych?psych.confidence:'', psych?psych.stress:'', psych?psych.energy:'', psych?psych.compliance:'',
       lessons.join(' | ').replace(/\n/g,' ')];
@@ -2801,7 +2436,6 @@ function exportXLSX(){
     const lessons=(t.lessonIds||[]).map(id=>{const l=state.lessons.find(x=>x.id===id);return l?l.mistake:'';}).filter(Boolean);
     return {
       Date:new Date(t.datetime).toLocaleString(), Symbol:t.symbol, 'Asset Class':t.assetClass, Direction:t.direction,
-      Status:t.status||'', TRS:t.trs!=null?t.trs:'',
       Strategy:strategyName(t.strategyId), 'Setup Grade':t.setupGrade, Entry:t.entry, Stop:t.stop, Target:t.target,
       Exit:t.exit, 'Qty':t.size, 'Risk Amount':t.riskAmount, Commission:t.commission, 'Gross P/L':t.grossPL,
       'Net P/L':netPL(t), 'R Multiple':r!=null?Number(r.toFixed(3)):'', Notes:t.notes,
@@ -2826,26 +2460,10 @@ function exportXLSX(){
 
   // Lessons sheet
   const lessonRows=state.lessons.slice().sort((a,b)=>(a.created||0)-(b.created||0)).map(l=>({
-    Date:fmtDate(l.created), Category:l.category, Severity:l.severity||'', Status:l.status||'', Owner:l.owner||'',
-    Mistake:l.mistake, 'Root Cause':l.rootCause, Resolution:l.resolution, Prevention:l.prevention,
+    Date:fmtDate(l.created), Category:l.category, Mistake:l.mistake, 'Root Cause':l.rootCause, Resolution:l.resolution, Prevention:l.prevention,
     'Linked Trades':tradesLinkingLesson(l.id).map(t=>t.symbol+' '+fmtDate(t.datetime)).join(' | ')
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lessonRows.length?lessonRows:[{Date:'(none)'}]), 'Lessons');
-
-  // Holdings sheet
-  const holdRows=(state.holdings||[]).map(h=>{
-    const val=(Number(h.shares)||0)*(Number(h.price)||0); const inc=holdingAnnualIncome(h);
-    return {Symbol:h.symbol, Name:h.name||'', Shares:Number(h.shares)||0, Price:Number(h.price)||0, Value:val,
-      Frequency:h.frequency||'', 'Yield %':val>0?Number((inc/val*100).toFixed(2)):'', 'Income/yr':Number(inc.toFixed(2)), Note:h.note||''};
-  });
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(holdRows.length?holdRows:[{Symbol:'(none)'}]), 'Holdings');
-
-  // Dividends sheet
-  const divRows=(state.dividends||[]).slice().sort((a,b)=>(a.datetime||0)-(b.datetime||0)).map(d=>({
-    Date:new Date(d.datetime).toLocaleString(), Symbol:d.symbol||'', 'Per Share':d.perShare||'', Shares:d.shares||'',
-    Amount:Number(d.amount)||0, Note:d.note||''
-  }));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(divRows.length?divRows:[{Date:'(none)'}]), 'Dividends');
 
   XLSX.writeFile(wb, 'tradeops-workbook-'+new Date().toISOString().slice(0,10)+'.xlsx');
   toast('Excel workbook exported');
